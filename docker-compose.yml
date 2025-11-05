@@ -1,19 +1,26 @@
 version: "3.8"
 services:
   nginx:
-    image: nginx:1.25-alpine
+    build: ./nginx
     container_name: nginx
+    env_file:
+      - .env
+    environment:
+      - DOMAIN=${DOMAIN}
+      - SSL_CERT_NAME=${SSL_CERT_NAME}
+      - SSL_KEY_NAME=${SSL_KEY_NAME}
+      - SLIVER_HTTP_PORT=${SLIVER_HTTP_PORT}
+      - SLIVER_C2_PATH=${SLIVER_C2_PATH}
     ports:
-      - "80:80"
-      - "443:443"
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
       - weather
       - sliver
     networks:
-      - demo_net
+      - ${NETWORK_NAME:-demo_net}
 
   weather:
     build: ./weather
@@ -21,22 +28,25 @@ services:
     expose:
       - "5000"
     networks:
-      - demo_net
+      - ${NETWORK_NAME:-demo_net}
 
   sliver:
     build: ./sliver
     container_name: sliver
+    env_file:
+      - .env
     stdin_open: true
     tty: true
     environment:
-      SLIVER_HTTP_PORT: "8080"
-      SLIVER_AUTOSTART_HTTP: "1"
+      - SLIVER_HTTP_PORT=${SLIVER_HTTP_PORT:-8080}
+      - SLIVER_AUTOSTART_HTTP=${SLIVER_AUTOSTART_HTTP:-1}
     volumes:
-      - ${HOME}/.sliver:/home/sliver/.sliver
-      - ./builds:/home/sliver/builds
+      - ${SLIVER_CONFIG_DIR:-${HOME}/.sliver}:/home/sliver/.sliver
+      - ${BUILDS_DIR:-./builds}:/home/sliver/builds
     networks:
-      - demo_net
+      - ${NETWORK_NAME:-demo_net}
 
 networks:
   demo_net:
+    name: ${NETWORK_NAME:-demo_net}
     driver: bridge

