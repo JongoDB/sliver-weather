@@ -70,45 +70,17 @@ SSL_KEY_NAME=${DOMAIN}.key
 
 ### 3. SSL Certificate Setup
 
-Generate SSL certificates matching your `DOMAIN` value. You have a few options:
-
-**Option 1: Source .env and use the variable** (recommended if .env is already configured):
+Generate SSL certificates matching your `DOMAIN` value:
 
 ```bash
 cd nginx/certs
-source ../.env  # or: . ../.env
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout ${DOMAIN}.key \
   -out ${DOMAIN}.crt \
   -subj "/CN=${DOMAIN}"
 ```
 
-**Option 2: Replace ${DOMAIN} with your actual domain/IP** (simplest):
-
-```bash
-cd nginx/certs
-# Replace 'your-domain-or-ip.com' with your actual domain or IP
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout your-domain-or-ip.com.key \
-  -out your-domain-or-ip.com.crt \
-  -subj "/CN=your-domain-or-ip.com"
-```
-
-**Option 3: Read DOMAIN from .env directly** (if .env exists in project root):
-
-```bash
-cd nginx/certs
-DOMAIN=$(grep ^DOMAIN= ../.env | cut -d '=' -f2)
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout ${DOMAIN}.key \
-  -out ${DOMAIN}.crt \
-  -subj "/CN=${DOMAIN}"
-```
-
-**Important**: 
-- The certificate file names must match `SSL_CERT_NAME` and `SSL_KEY_NAME` from your `.env` file (default: `${DOMAIN}.crt` and `${DOMAIN}.key`)
-- If you're using an IP address, use the IP directly (e.g., `192.168.1.100`)
-- The Common Name (CN) in the certificate should match your `DOMAIN` value
+**Note**: Replace `${DOMAIN}` with your actual domain or IP address, or use the value from your `.env` file.
 
 Alternatively, if you're using a domain, you can use Let's Encrypt or other certificate authorities.
 
