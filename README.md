@@ -162,7 +162,6 @@ After generating the implant, you need to:
 2. **Execute the implant on the target host**:
    ```bash
    # On the target host
-   chmod +x /tmp/your_implant_name
    /tmp/your_implant_name
    ```
 
