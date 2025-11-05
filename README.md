@@ -40,7 +40,7 @@ This project demonstrates how Sliver C2 can be deployed alongside legitimate web
 ### 1. Clone and Navigate
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/JongoDB/sliver-weather.git
 cd sliver-weather
 ```
 
@@ -86,14 +86,26 @@ Alternatively, if you're using a domain, you can use Let's Encrypt or other cert
 
 ### 4. Start the Services
 
+**Important**: Make sure you have created your `.env` file before starting services. The nginx container uses environment variables to configure itself, and missing variables will cause startup failures.
+
 ```bash
+docker compose up -d --build
+```
+
+The `--build` flag ensures containers are rebuilt with the latest configuration. This will:
+- Build the nginx, weather, and sliver containers
+- Substitute environment variables in nginx configuration at startup
+- Start all services
+
+**Note**: If you change your `.env` file after containers are built, you must rebuild the nginx container:
+```bash
+docker compose build nginx
 docker compose up -d
 ```
 
-This will:
-- Build the nginx, weather, and sliver containers
-- Substitute environment variables in nginx configuration
-- Start all services
+**Certificate File Naming**: Ensure your SSL certificate files in `nginx/certs/` match the names specified in your `.env` file:
+- Certificate file: `${SSL_CERT_NAME}` (default: `${DOMAIN}.crt`)
+- Private key file: `${SSL_KEY_NAME}` (default: `${DOMAIN}.key`)
 
 ### 5. Access Sliver Server
 
@@ -242,8 +254,13 @@ All services use the `.env` file for configuration. The nginx service uses an en
 ### SSL Certificate Errors
 
 - Ensure certificates are in `nginx/certs/` directory
-- Check certificate file permissions
-- Verify certificate matches the server name in nginx.conf
+- Check certificate file permissions (should be readable by nginx user)
+- Verify certificate file names match `${SSL_CERT_NAME}` and `${SSL_KEY_NAME}` from your `.env` file
+- Ensure the certificate Common Name (CN) matches your `DOMAIN` value
+- If you see "No such file or directory" errors, check that:
+  - Your `.env` file exists and has `DOMAIN` set
+  - Certificate filenames in `nginx/certs/` match `SSL_CERT_NAME` and `SSL_KEY_NAME` from `.env`
+  - You've rebuilt the nginx container after creating/updating `.env`: `docker compose build nginx`
 
 ### Implant Not Connecting
 
