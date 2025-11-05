@@ -1,0 +1,42 @@
+version: "3.8"
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - weather
+      - sliver
+    networks:
+      - demo_net
+
+  weather:
+    build: ./weather
+    container_name: weather
+    expose:
+      - "5000"
+    networks:
+      - demo_net
+
+  sliver:
+    build: ./sliver
+    container_name: sliver
+    stdin_open: true
+    tty: true
+    environment:
+      SLIVER_HTTP_PORT: "8080"
+      SLIVER_AUTOSTART_HTTP: "1"
+    volumes:
+      - ${HOME}/.sliver:/home/sliver/.sliver
+      - ./builds:/home/sliver/builds
+    networks:
+      - demo_net
+
+networks:
+  demo_net:
+    driver: bridge

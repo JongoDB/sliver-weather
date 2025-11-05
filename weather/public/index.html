@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>JonDevs Weather</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="url(#g)"/>
+        <defs>
+          <linearGradient id="g" x1="0" x2="1">
+            <stop offset="0" stop-color="#4facfe"/><stop offset="1" stop-color="#00f2fe"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div>
+        <h1>JonDevs Weather</h1>
+        <p class="muted">Live data via server-side open weather APIs</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label class="sr-only" for="location">Location</label>
+      <input id="location" placeholder="Try: Seattle, Paris, Tokyo" />
+      <button id="refresh" title="Refresh">Refresh</button>
+      <button id="modeToggle" aria-pressed="false" title="Toggle dark mode">🌙</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="current-card" id="current">
+        <div class="empty">
+	  <h2>Search for a location</h2>
+          <p class="muted">Enter a city above and press <strong>Refresh</strong> (or hit Enter).</p>
+      </div>
+
+      <aside class="meta">
+        <h3>How to use</h3>
+        <ol>
+          <li>Enter a city and click <strong>Refresh</strong>.</li>
+          <li>The server geocodes your query and fetches live weather.</li>
+          <li>Use 🌙 for dark mode (handy in dim rooms).</li>
+        </ol>
+        <p class="muted">This UI calls <code>/api/weather?q=&lt;location&gt;</code> on your backend.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2 class="section-title">7-Day Forecast</h2>
+      <div id="forecast" class="grid"></div>
+    </section>
+
+    <footer class="footer">
+      <small>JonDevs Weather • Totally Not a Fake Website</small>
+    </footer>
+  </main>
+
+  <script>
+    // ======================
+    // DOM refs
+    // ======================
+    const locationInput = document.getElementById('location');
+    const refreshBtn = document.getElementById('refresh');
+    const loader = document.getElementById('loader');
+    const currentCard = document.getElementById('current');
+    const forecastGrid = document.getElementById('forecast');
+    const modeToggle = document.getElementById('modeToggle');
+
+    // ======================
+    // UI helpers
+    // ======================
+    function setLoading(on=true) {
+      if (!loader) return;
+      loader.style.display = on ? 'block' : 'none';
+    }
+
+    function iconFor(desc) {
+      const d = (desc || '').toLowerCase();
+      if (d.includes('sun') || d.includes('clear')) {
+        return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="5"/>
+                  <g stroke="#fff" stroke-width="1.5" stroke-linecap="round">
+                    <line x1="12" y1="1" x2="12" y2="4"/>
+                    <line x1="12" y1="20" x2="12" y2="23"/>
+                    <line x1="1" y1="12" x2="4" y2="12"/>
+                    <line x1="20" y1="12" x2="23" y2="12"/>
+                  </g>
+                </svg>`;
+      }
+      return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 15a4 4 0 0 1 4-4h8a3 3 0 0 1 0 6H7a4 4 0 0 1-4-2z"/>
+              </svg>`;
+    }
+
+    function weatherCodeToText(code) {
+      const map = {
+        0: "Clear",
+        1: "Mainly Clear",
+        2: "Partly Cloudy",
+        3: "Overcast",
+        45: "Fog",
+        48: "Rime Fog",
+        51: "Drizzle",
+        53: "Drizzle",
+        55: "Drizzle",
+        61: "Rain",
+        63: "Rain",
+        65: "Rain",
+        71: "Snow",
+        73: "Snow",
+        75: "Snow",
+        80: "Rain Showers",
+        81: "Rain Showers",
+        82: "Heavy Showers",
+        95: "Thunderstorm",
+        96: "Thundershowers",
+        99: "Severe Thunderstorm"
+      };
+      return map[code] ?? (code === undefined ? "Unknown" : "Code " + code);
+    }
+
+    function renderCurrent(flat) {
+      if (!flat.forecast || flat.forecast.length === 0) {
+        currentCard.innerHTML = `<div class="error">No data.</div>`;
+        return;
+      }
+      const now = flat.forecast[0];
+      const t = new Date(flat.timestamp).toLocaleString();
+      currentCard.innerHTML = `
+        <div class="cond">
+          ${iconFor(now.desc)}
+          <div>
+            <h2>${flat.location}</h2>
+            <p class="muted">Updated: ${t}</p>
+          </div>
+        </div>
+        <div class="temp">
+          <div class="big">${Number.isFinite(now.high) ? now.high + '°F' : '-'}</div>
+          <div class="small">Low ${Number.isFinite(now.low) ? now.low + '°' : '-'} • ${now.desc}</div>
+        </div>
+      `;
+    }
+
+    function renderForecast(flat) {
+      forecastGrid.innerHTML = '';
+      (flat.forecast || []).forEach(day => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = `
+          <div class="card-head">
+            <div class="day">${day.day}</div>
+            ${iconFor(day.desc)}
+          </div>
+          <div class="card-body">
+            <div class="temp-large">${Number.isFinite(day.high) ? day.high + '°' : '-'}</div>
+            <div class="muted">Low ${Number.isFinite(day.low) ? day.low + '°' : '-'}</div>
+            <div class="desc">${day.desc}</div>
+          </div>
+        `;
+        forecastGrid.appendChild(el);
+      });
+    }
+
+    // ======================
+    // Fetch from your backend: /api/weather?q=<location>
+    // ======================
+    async function fetchWeather() {
+      try {
+        setLoading(true);
+        const loc = encodeURIComponent(locationInput.value || "");
+        const url = `/api/weather?q=${loc}`;
+        const res = await fetch(url);
+        const j = await res.json();
+        setLoading(false);
+
+        if (!res.ok || j.error) {
+          const msg = j?.message || j?.error || `HTTP ${res.status}`;
+          currentCard.innerHTML = `<div class="error">API error: ${msg}</div>`;
+          forecastGrid.innerHTML = '';
+          return;
+        }
+
+        // Flatten Open-Meteo style response into our UI shape
+        const flat = {
+          location: j.location || locationInput.value || 'Unknown',
+          timestamp: j.timestamp || new Date().toISOString(),
+          forecast: []
+        };
+
+        if (j.daily && Array.isArray(j.daily.time)) {
+          const times = j.daily.time;
+          const highs = j.daily.temperature_2m_max || [];
+          const lows  = j.daily.temperature_2m_min || [];
+          const codes = j.daily.weathercode || [];
+          for (let i = 0; i < times.length; i++) {
+            flat.forecast.push({
+              day: (new Date(times[i])).toLocaleDateString(undefined, { weekday: "short" }),
+              high: Math.round(highs[i]),
+              low: Math.round(lows[i]),
+              desc: weatherCodeToText(codes[i])
+            });
+          }
+        } else if (j.current) {
+          // Fallback: only current weather available
+          flat.forecast.push({
+            day: new Date(flat.timestamp).toLocaleDateString(undefined, { weekday: "short" }),
+            high: Math.round(j.current.temperature),
+            low: Math.round(j.current.temperature),
+            desc: "Current"
+          });
+        }
+
+        renderCurrent(flat);
+        renderForecast(flat);
+      } catch (e) {
+        setLoading(false);
+        currentCard.innerHTML = `<div class="error">Error fetching data — check server console</div>`;
+        forecastGrid.innerHTML = '';
+        console.error(e);
+      }
+    }
+
+    // ======================
+    // Wire up UI
+    // ======================
+    refreshBtn.addEventListener('click', fetchWeather);
+    locationInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') fetchWeather();
+    });
+    modeToggle.addEventListener('click', () => {
+      const dark = document.body.classList.toggle('dark');
+      modeToggle.setAttribute('aria-pressed', dark ? 'true' : 'false');
+      modeToggle.textContent = dark ? '☀️' : '🌙';
+    });
+
+    // Initial load
+    // fetchWeather();
+  </script>
+</body>
+</html>

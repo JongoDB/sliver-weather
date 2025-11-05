@@ -1,0 +1,47 @@
+# Build artifacts
+builds/
+*.exe
+*.bin
+*.so
+*.dylib
+
+# SSL certificates and keys (sensitive)
+nginx/certs/*.key
+nginx/certs/*.crt
+nginx/certs/*.pem
+!nginx/certs/.gitkeep
+
+# Sliver configuration (contains sensitive data)
+~/.sliver/
+.sliver/
+
+# Docker volumes
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node modules (if not using multi-stage build)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.env.local
+
+# Backup files
+*.bak
+*.backup
+
+# Permission-restricted files
+nginx/PROUD_FORT
+
