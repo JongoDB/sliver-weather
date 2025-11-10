@@ -1,21 +1,15 @@
-FROM nginx:1.25-alpine
+FROM nginx:1.27-alpine
 
-# Install gettext for envsubst
-RUN apk add --no-cache gettext
+# tools for templating + self-signed certs
+RUN apk add --no-cache openssl gettext
 
-# Remove default site so only our config runs
-RUN rm -f /etc/nginx/conf.d/default.conf
-
-# Copy our config template (will be processed by entrypoint)
+# Put templates in /etc/nginx where the entrypoint expects them
 COPY nginx.conf.template /etc/nginx/nginx.conf.template
+COPY nginx.http.conf.template /etc/nginx/nginx.http.conf.template
 
-# Copy entrypoint script
+# Custom entrypoint that selects template based on USE_TLS
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Create certs directory (certs will be mounted as volume)
-RUN mkdir -p /etc/nginx/certs
-
-# Use custom entrypoint
+# Nginx runs in foreground; our script renders then execs nginx
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["nginx", "-g", "daemon off;"]
