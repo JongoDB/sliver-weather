@@ -493,11 +493,11 @@ http {
 
 4. Pull the published weather application image (replace the reference with your registry path if you maintain a private copy):
    ```bash
-   sudo docker pull ghcr.io/jongodb/sliver-weather-weather:latest
+   sudo docker pull ghcr.io/jongodb/sliver-weather-frontend:latest
    ```
 5. Run the weather app behind nginx:
    ```bash
-   sudo docker run -d --name weather-app --restart unless-stopped -p 5000:5000 ghcr.io/jongodb/sliver-weather-weather:latest
+   sudo docker run -d --name weather-app --restart unless-stopped -p 5000:5000 ghcr.io/jongodb/sliver-weather-frontend:latest
    ```
    - If you prefer to build locally, clone the repo elsewhere, run `docker build -t <your-tag> weather/`, push it to your registry, and substitute that tag in the `docker run` command.
 6. Restart nginx to load the new configuration:
