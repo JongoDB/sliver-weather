@@ -416,25 +416,7 @@ If you want to split responsibilities across hosts—running the weather cover t
    sudo apt install -y nginx git docker.io docker-compose-plugin
    sudo systemctl enable nginx docker --now
    ```
-3. Clone the repository and copy the standalone nginx template:
-   ```bash
-   git clone https://github.com/JongoDB/sliver-weather.git
-   ```
-   - Adjust `server_name` and any upstream ports inside `/etc/nginx/nginx.conf` to match your VM IP/domain. The default upstreams expect the weather app on `localhost:5000` and the SSH tunnel on `localhost:8080`.
-   - Use the sample configuration below as a starting point.
-4. Restart nginx to load the new configuration:
-   ```bash
-   sudo nginx -t
-   sudo systemctl restart nginx
-   ```
-5. Build and run the weather app (detached container is the simplest approach):
-   ```bash
-   cd sliver-weather/weather
-   sudo docker build -t weather-app .
-   sudo docker run -d --name weather-app --restart unless-stopped -p 5000:5000 weather-app
-   ```
-   - The nginx upstream `weather_upstream` now routes `/weather/` and `/api/weather/` to this container.
-6. (Optional) Enable HTTPS with a certificate manager on the VM. Update `/etc/nginx/nginx.conf` accordingly if you terminate TLS on nginx.
+3. Copy the embedded sample configuration below into `/etc/nginx/nginx.conf`, then tailor values (especially `server_name` and upstream addresses) to match your VM. The defaults assume the weather app listens on `localhost:5000` and the SSH tunnel terminates on `localhost:8080`.
 
 #### Sample `nginx.conf`
 
@@ -509,6 +491,30 @@ http {
 }
 ```
 
+4. Clone the repository to grab the weather service code:
+   ```bash
+   git clone --depth 1 https://github.com/JongoDB/sliver-weather.git
+   ```
+   - After cloning you only need the `weather/` directory on this VM. Remove the remaining documentation assets (including the `png/` screenshots) so they stay only in the remote repository or on your local workstation:
+     ```bash
+     rm -rf sliver-weather/png sliver-weather/sliver sliver-weather/nginx sliver-weather/builds \
+            sliver-weather/certs sliver-weather/*.md
+     ```
+     (These deletions apply only to the cloud VM checkout; the assets remain in GitHub for future clones.)
+5. Restart nginx to load the new configuration:
+   ```bash
+   sudo nginx -t    # syntax check and debug validation
+   sudo systemctl restart nginx
+   ```
+6. Build and run the weather app (detached container is the simplest approach):
+   ```bash
+   cd sliver-weather/weather
+   sudo docker build -t weather-app .
+   sudo docker run -d --name weather-app --restart unless-stopped -p 5000:5000 weather-app
+   ```
+   - The nginx upstream `weather_upstream` now routes `/weather/` and `/api/weather/` to this container.
+7. (Optional) Enable HTTPS with a certificate manager on the VM. Update `/etc/nginx/nginx.conf` accordingly if you terminate TLS on nginx.
+
 ### Local Host (Sliver C2 + reverse tunnel endpoint)
 
 1. Install Sliver (example installer):
@@ -527,10 +533,10 @@ http {
    ```
 3. Create the reverse SSH tunnel so the cloud VM can reach your local listener:
    ```bash
-   ssh -N -R 8080:localhost:8080 <cloud-user>@<cloud-vm-public-ip-or-domain>
+   ssh -R 8080:localhost:8080 <cloud-user>@<cloud-vm-public-ip-or-domain>
    ```
    - `-R 8080:localhost:8080` binds port `8080` on the cloud VM (referenced by nginx as `tunnel`) to the Sliver listener on your local host.
-   - Keep this SSH session persistent (consider `autossh` or a systemd user unit).
+   - Keep this SSH session persistent (consider `autossh` or a systemd user unit). Add `-N` if you prefer the tunnel to run without an interactive shell.
 4. Transfer the generated implant to the target system, execute it, and monitor sessions from the local Sliver console as usual.
 
 ### Operational Tips
