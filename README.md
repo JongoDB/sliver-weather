@@ -491,26 +491,19 @@ http {
 }
 ```
 
-4. Clone the repository to grab the weather service code:
+4. Pull the published weather application image (replace the reference with your registry path if you maintain a private copy):
    ```bash
-   git clone --depth 1 https://github.com/JongoDB/sliver-weather.git
+   sudo docker pull ghcr.io/jongodb/sliver-weather-weather:latest
    ```
-   - After cloning you only need the `weather/` directory on this VM. Remove the remaining documentation assets (including the `png/` screenshots) so they stay only in the remote repository or on your local workstation:
-     ```bash
-     rm -rf sliver-weather/png sliver-weather/sliver sliver-weather/nginx sliver-weather/builds \
-            sliver-weather/certs sliver-weather/*.md
-     ```
-     (These deletions apply only to the cloud VM checkout; the assets remain in GitHub for future clones.)
-5. Restart nginx to load the new configuration:
+5. Run the weather app behind nginx:
+   ```bash
+   sudo docker run -d --name weather-app --restart unless-stopped -p 5000:5000 ghcr.io/jongodb/sliver-weather-weather:latest
+   ```
+   - If you prefer to build locally, clone the repo elsewhere, run `docker build -t <your-tag> weather/`, push it to your registry, and substitute that tag in the `docker run` command.
+6. Restart nginx to load the new configuration:
    ```bash
    sudo nginx -t    # syntax check and debug validation
    sudo systemctl restart nginx
-   ```
-6. Build and run the weather app (detached container is the simplest approach):
-   ```bash
-   cd sliver-weather/weather
-   sudo docker build -t weather-app .
-   sudo docker run -d --name weather-app --restart unless-stopped -p 5000:5000 weather-app
    ```
    - The nginx upstream `weather_upstream` now routes `/weather/` and `/api/weather/` to this container.
 7. (Optional) Enable HTTPS with a certificate manager on the VM. Update `/etc/nginx/nginx.conf` accordingly if you terminate TLS on nginx.
