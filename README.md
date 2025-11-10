@@ -457,6 +457,11 @@ http {
   server {
     listen 80;
     server_name example.com www.example.com;
+    # If you terminate TLS on this host, uncomment the directives below and point them at your certificate material.
+    # listen 443 ssl http2;
+    # ssl_certificate     /etc/nginx/certs/example.com.crt;
+    # ssl_certificate_key /etc/nginx/certs/example.com.key;
+    # add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
 
     location = / { return 302 /weather/; }
 
@@ -507,6 +512,15 @@ http {
    ```
    - The nginx upstream `weather_upstream` now routes `/weather/` and `/api/weather/` to this container.
 7. (Optional) Enable HTTPS with a certificate manager on the VM. Update `/etc/nginx/nginx.conf` accordingly if you terminate TLS on nginx.
+   - To bootstrap with a self-signed certificate (replace `example.com` with your domain):
+     ```bash
+     sudo mkdir -p /etc/nginx/certs
+     sudo openssl req -x509 -nodes -newkey rsa:4096 \
+       -keyout /etc/nginx/certs/example.com.key \
+       -out /etc/nginx/certs/example.com.crt \
+       -days 365 \
+       -subj "/CN=example.com"
+     ```
 
 ### Local Host (Sliver C2 + reverse tunnel endpoint)
 
