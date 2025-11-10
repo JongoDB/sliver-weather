@@ -45,6 +45,8 @@ yarn-error.log
 # Permission-restricted files
 nginx/PROUD_FORT
 
-# Old nginx.conf (now using template)
+# Old nginx.conf
 nginx/nginx.conf
 
+# README pictures
+png/*.png
