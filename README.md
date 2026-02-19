@@ -46,6 +46,11 @@ The cover application is a full React single-page app built with Vite and served
 
 The Dockerfile uses a multi-stage build: Vite compiles the React app in a builder stage, then the production image copies only the compiled `dist/` output alongside the Express server.
 
+<p align="center">
+  <img src="png/weather-explore.png" alt="Explore page with download ad" width="800"><br>
+  <em>The Explore page: mock weather news and the "AtmosVision Pro" ad that delivers the implant binary.</em>
+</p>
+
 ### Weather Data Flow
 
 Requests to the cover application's `/api/weather` endpoint bubble through nginx to the Node weather service. That service:

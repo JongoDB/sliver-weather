@@ -54,6 +54,3 @@ nginx/nginx.conf
 
 # Temp / test files
 testfile
-
-# README pictures
-png/*.png
