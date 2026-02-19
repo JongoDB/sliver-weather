@@ -146,24 +146,28 @@ app.get("/api/download/latest", async (req, res) => {
     // Detect OS from User-Agent
     const userAgent = req.headers['user-agent'] || '';
     const isWindows = /Windows/i.test(userAgent);
+    const isMac = /Macintosh/i.test(userAgent);
     const isLinux = /Linux/i.test(userAgent) && !/Android/i.test(userAgent);
 
     console.log(`User-Agent: ${userAgent}`);
-    console.log(`Detected OS - Windows: ${isWindows}, Linux: ${isLinux}`);
+    console.log(`Detected OS - Windows: ${isWindows}, macOS: ${isMac}, Linux: ${isLinux}`);
 
-    // Read all files in the builds directory (exclude .tar.gz temp files)
+    // Read all files in the builds directory (exclude .tar.gz temp files and symlinks-in-progress)
     const files = await readdir(buildsDir);
-    let filteredFiles = files.filter(f => !f.endsWith('.tar.gz'));
+    let filteredFiles = files.filter(f => !f.endsWith('.tar.gz') && !f.startsWith('AtmosVision'));
 
     // Filter by OS name in filename
+    // Sliver names implants with the target OS: windows, linux, darwin/macos
     const osFilteredFiles = filteredFiles.filter(filename => {
       const lowerName = filename.toLowerCase();
       if (isWindows) {
         return lowerName.includes('windows');
+      } else if (isMac) {
+        return lowerName.includes('darwin') || lowerName.includes('macos');
       } else if (isLinux) {
         return lowerName.includes('linux');
       } else {
-        // For other OS (macOS, etc), prefer linux builds
+        // Unknown OS: try linux first, then anything
         return lowerName.includes('linux');
       }
     });
