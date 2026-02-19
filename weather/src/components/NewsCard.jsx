@@ -1,15 +1,15 @@
+import { useNavigate } from 'react-router-dom'
+
 function NewsCard({ article }) {
+  const navigate = useNavigate()
+
   const handleClick = () => {
-    if (article.link && article.link !== '#') {
-      window.open(article.link, '_blank')
-    }
+    navigate(`/explore/article/${article.id}`)
   }
 
   const handleReadMore = (e) => {
     e.stopPropagation()
-    if (article.link && article.link !== '#') {
-      window.open(article.link, '_blank')
-    }
+    navigate(`/explore/article/${article.id}`)
   }
 
   return (
