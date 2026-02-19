@@ -3,7 +3,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { readdir, stat, unlink } from "fs/promises";
+import { readdir, stat, unlink, symlink } from "fs/promises";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -196,29 +196,35 @@ app.get("/api/download/latest", async (req, res) => {
 
     // Determine the file extension from the original file
     const originalExt = path.extname(latestFile.filename);
-    const baseName = path.basename(latestFile.filename, originalExt);
 
-    // Windows: serve directly with original filename
+    // Rename for download: present as "AtmosVisionPro" to the browser
+    const disguisedName = isWindows
+      ? `AtmosVisionPro${originalExt || '.exe'}`
+      : 'AtmosVisionPro';
+
+    // Windows: serve directly
     if (isWindows) {
-      const downloadFilename = latestFile.filename;
-      console.log(`Serving for Windows: ${downloadFilename}`);
-      res.setHeader("Content-Disposition", `attachment; filename="${downloadFilename}"`);
+      console.log(`Serving for Windows: ${latestFile.filename} → ${disguisedName}`);
+      res.setHeader("Content-Disposition", `attachment; filename="${disguisedName}"`);
       res.setHeader("Content-Type", "application/octet-stream");
       return res.sendFile(latestFile.path);
     }
 
-    // Linux/macOS: create tar.gz with original filename preserved
-    const tarFileName = `${baseName}.tar.gz`;
+    // Linux/macOS: create tar.gz with disguised name
+    const tarFileName = `${disguisedName}.tar.gz`;
     const tarFilePath = path.join(buildsDir, tarFileName);
-    const archivedFile = latestFile.filename;
-
+    // Temp symlink so the archive contains the disguised name
+    const linkPath = path.join(buildsDir, disguisedName);
     try {
-      // Create tar.gz directly with original filename to preserve binary behavior
-      const tarCommand = `tar -czhf "${tarFilePath}" -C "${buildsDir}" "${archivedFile}"`;
+      await unlink(linkPath).catch(() => {});
+      await symlink(latestFile.path, linkPath);
+
+      const tarCommand = `tar -czhf "${tarFilePath}" -C "${buildsDir}" "${disguisedName}"`;
       console.log(`Running tar command: ${tarCommand}`);
       const { stdout, stderr } = await execAsync(tarCommand);
       if (stdout) console.log(`tar stdout: ${stdout}`);
       if (stderr) console.log(`tar stderr: ${stderr}`);
+      await unlink(linkPath).catch(() => {});
 
       console.log(`Tar created successfully: ${tarFilePath}`);
 
@@ -246,10 +252,10 @@ app.get("/api/download/latest", async (req, res) => {
       // Clean up any leftover files
       try {
         await unlink(tarFilePath).catch(() => {});
+        await unlink(linkPath).catch(() => {});
       } catch {}
-      // Fallback to direct download with original filename
-      const downloadFilename = latestFile.filename;
-      res.setHeader("Content-Disposition", `attachment; filename="${downloadFilename}"`);
+      // Fallback to direct download with disguised filename
+      res.setHeader("Content-Disposition", `attachment; filename="${disguisedName}"`);
       res.setHeader("Content-Type", "application/octet-stream");
       res.sendFile(latestFile.path);
     }
