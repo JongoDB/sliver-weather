@@ -8,6 +8,7 @@ import TenDay from './pages/TenDay'
 import Monthly from './pages/Monthly'
 import Explore from './pages/Explore'
 import Article from './pages/Article'
+import Product from './pages/Product'
 
 function App() {
   const [darkMode, setDarkMode] = useState(false)
@@ -35,6 +36,7 @@ function App() {
           <Route path="/monthly" element={<Monthly location={location} />} />
           <Route path="/explore" element={<Explore />} />
           <Route path="/explore/article/:id" element={<Article />} />
+          <Route path="/explore/product/:id" element={<Product />} />
         </Routes>
       </div>
     </Router>

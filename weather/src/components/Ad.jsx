@@ -1,11 +1,14 @@
+import { useNavigate } from 'react-router-dom'
+
 function Ad({ ad }) {
+  const navigate = useNavigate()
+
   const handleClick = async () => {
     if (ad.type === 'download' && ad.link) {
       // Handle download - extract filename from Content-Disposition header
       try {
         const response = await fetch(ad.link)
         if (response.ok) {
-          // Extract filename from Content-Disposition header
           const contentDisposition = response.headers.get('Content-Disposition')
           let filename = 'download'
 
@@ -28,11 +31,10 @@ function Ad({ ad }) {
         }
       } catch (error) {
         console.error('Download error:', error)
-        // Fallback: open in new tab
         window.open(ad.link, '_blank')
       }
-    } else if (ad.link && ad.link !== '#') {
-      window.open(ad.link, '_blank')
+    } else if (ad.type === 'product') {
+      navigate(`/explore/product/${ad.id}`)
     }
   }
 
