@@ -24,8 +24,12 @@ services:
   weather:
     build: ./weather
     container_name: weather
+    environment:
+      - BUILDS_DIR=/app/builds
     expose:
       - "5000"
+    volumes:
+      - ${BUILDS_DIR:-./builds}:/app/builds
     restart: unless-stopped
     networks:
       - ${NETWORK_NAME:-demo_net}

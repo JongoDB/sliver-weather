@@ -1,11 +1,15 @@
 # Build artifacts
 builds/
+weather/dist/
 *.exe
 *.bin
 *.so
 *.dylib
 
 # SSL certificates and keys (sensitive)
+certs/*.key
+certs/*.crt
+certs/*.pem
 nginx/certs/*.key
 nginx/certs/*.crt
 nginx/certs/*.pem
@@ -47,6 +51,9 @@ nginx/PROUD_FORT
 
 # Old nginx.conf
 nginx/nginx.conf
+
+# Temp / test files
+testfile
 
 # README pictures
 png/*.png
