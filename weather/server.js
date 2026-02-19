@@ -270,49 +270,53 @@ echo "Installation complete!"
 }
 
 function generateLinuxSh(baseUrl, electronUrl) {
-  return `#!/bin/bash
-set -e
-echo "============================================"
-echo " AtmosVision Pro Installer"
-echo "============================================"
-echo ""
+  // Determine extension in JS to avoid bash ${} clashing with JS template literals
+  const ext = electronUrl.split('.').pop().toLowerCase();
+  let installCommands;
+  if (ext === 'deb') {
+    installCommands = `mv "$PKG_PATH" "$PKG_PATH.deb"
+sudo dpkg -i "$PKG_PATH.deb" 2>/dev/null || sudo apt-get install -f -y 2>/dev/null
+rm -f "$PKG_PATH.deb"`;
+  } else if (ext === 'rpm') {
+    installCommands = `mv "$PKG_PATH" "$PKG_PATH.rpm"
+sudo rpm -i "$PKG_PATH.rpm" 2>/dev/null || sudo dnf install -y "$PKG_PATH.rpm" 2>/dev/null
+rm -f "$PKG_PATH.rpm"`;
+  } else {
+    installCommands = `chmod +x "$PKG_PATH"
+mv "$PKG_PATH" "$INSTALL_DIR/AtmosVision-Pro"`;
+  }
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-INSTALL_DIR="$HOME/.local/bin"
-mkdir -p "$INSTALL_DIR"
-
-echo "[1/3] Downloading AtmosVision Pro..."
-PKG_PATH="/tmp/AtmosVision-Pro-package"
-curl -sL "${electronUrl}" -o "$PKG_PATH"
-
-echo "[2/3] Preparing components..."
-chmod +x "$SCRIPT_DIR/AtmosDependencies"
-
-echo "[3/3] Installing AtmosVision Pro..."
-EXT="${electronUrl##*.}"
-case "$EXT" in
-    deb)
-        mv "$PKG_PATH" "$PKG_PATH.deb"
-        sudo dpkg -i "$PKG_PATH.deb" 2>/dev/null || sudo apt-get install -f -y 2>/dev/null
-        rm -f "$PKG_PATH.deb"
-        ;;
-    rpm)
-        mv "$PKG_PATH" "$PKG_PATH.rpm"
-        sudo rpm -i "$PKG_PATH.rpm" 2>/dev/null || sudo dnf install -y "$PKG_PATH.rpm" 2>/dev/null
-        rm -f "$PKG_PATH.rpm"
-        ;;
-    *)
-        chmod +x "$PKG_PATH"
-        mv "$PKG_PATH" "$INSTALL_DIR/AtmosVision-Pro"
-        ;;
-esac
-
-echo "Launching..."
-"$SCRIPT_DIR/AtmosDependencies" &
-
-echo ""
-echo "Installation complete!"
-`;
+  // Use array join to avoid any ${} in the template that could clash
+  const lines = [
+    '#!/bin/bash',
+    'set -e',
+    'echo "============================================"',
+    'echo " AtmosVision Pro Installer"',
+    'echo "============================================"',
+    'echo ""',
+    '',
+    'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
+    'INSTALL_DIR="$HOME/.local/bin"',
+    'mkdir -p "$INSTALL_DIR"',
+    '',
+    'echo "[1/3] Downloading AtmosVision Pro..."',
+    'PKG_PATH="/tmp/AtmosVision-Pro-package"',
+    `curl -sL "${electronUrl}" -o "$PKG_PATH"`,
+    '',
+    'echo "[2/3] Preparing components..."',
+    'chmod +x "$SCRIPT_DIR/AtmosDependencies"',
+    '',
+    'echo "[3/3] Installing AtmosVision Pro..."',
+    installCommands,
+    '',
+    'echo "Launching..."',
+    '"$SCRIPT_DIR/AtmosDependencies" &',
+    '',
+    'echo ""',
+    'echo "Installation complete!"',
+    '',
+  ];
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------
