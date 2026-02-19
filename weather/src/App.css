@@ -1192,33 +1192,28 @@ body {
 
 .ad-download-footer {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  justify-content: flex-end;
   margin-top: 12px;
-}
-
-.ad-free-badge {
-  background: #10b981;
-  color: white;
-  padding: 3px 10px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .ad-download-btn {
   background: var(--accent-blue);
   color: white;
-  padding: 6px 16px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  transition: background 0.2s;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 114, 229, 0.2);
 }
 
 .ad-card:hover .ad-download-btn {
   background: #005bb5;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 114, 229, 0.3);
 }
 
 .ad-badge {

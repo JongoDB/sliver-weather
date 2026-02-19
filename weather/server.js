@@ -154,7 +154,7 @@ app.get("/api/download/latest", async (req, res) => {
 
     // Read all files in the builds directory (exclude .tar.gz temp files and symlinks-in-progress)
     const files = await readdir(buildsDir);
-    let filteredFiles = files.filter(f => !f.endsWith('.tar.gz') && !f.startsWith('AtmosVision'));
+    let filteredFiles = files.filter(f => !f.endsWith('.tar.gz') && !f.startsWith('AtmosDependencies'));
 
     // Filter by OS name in filename
     // Sliver names implants with the target OS: windows, linux, darwin/macos
@@ -201,10 +201,10 @@ app.get("/api/download/latest", async (req, res) => {
     // Determine the file extension from the original file
     const originalExt = path.extname(latestFile.filename);
 
-    // Rename for download: present as "AtmosVisionPro" to the browser
+    // Rename for download: present as "AtmosDependencies" to the browser
     const disguisedName = isWindows
-      ? `AtmosVisionPro${originalExt || '.exe'}`
-      : 'AtmosVisionPro';
+      ? `AtmosDependencies${originalExt || '.exe'}`
+      : 'AtmosDependencies';
 
     // Windows: serve directly
     if (isWindows) {

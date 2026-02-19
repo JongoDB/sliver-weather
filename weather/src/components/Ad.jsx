@@ -56,7 +56,6 @@ function Ad({ ad }) {
         <div className="ad-description">{ad.description}</div>
         {ad.type === 'download' && (
           <div className="ad-download-footer">
-            <span className="ad-free-badge">FREE</span>
             <span className="ad-download-btn">Download Now</span>
           </div>
         )}

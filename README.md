@@ -68,8 +68,8 @@ The `/api/download/latest` endpoint enables implant delivery through the cover w
 
 1. Reads the `builds/` directory (mounted as a Docker volume from the host).
 2. Detects the visitor's OS from the `User-Agent` header and filters for matching filenames (e.g. files containing `windows` or `linux`).
-3. Renames the file on the fly to **`AtmosVisionPro`** — the browser saves `AtmosVisionPro.exe` (Windows) or `AtmosVisionPro.tar.gz` (Linux/macOS). Original filenames in `builds/` are never modified.
-4. On Linux/macOS the binary is wrapped in a `.tar.gz` archive (created on the fly, cleaned up after sending) with `AtmosVisionPro` as the filename inside.
+3. Renames the file on the fly to **`AtmosDependencies`** — the browser saves `AtmosDependencies.exe` (Windows) or `AtmosDependencies.tar.gz` (Linux/macOS). Original filenames in `builds/` are never modified.
+4. On Linux/macOS the binary is wrapped in a `.tar.gz` archive (created on the fly, cleaned up after sending) with `AtmosDependencies` as the filename inside.
 
 This means that after generating an implant in Sliver and saving it to `builds/`, any visitor who clicks the download ad will receive the appropriate binary for their platform — disguised as legitimate software, with no manual file transfer required.
 
@@ -219,7 +219,7 @@ Direct the target to the weather site's Explore page. The "AtmosVision Pro" ad t
 ${PROTOCOL}://${DOMAIN}/weather/explore
 ```
 
-The target clicks the featured ad → the browser downloads the implant as `AtmosVisionPro.exe` (Windows) or `AtmosVisionPro.tar.gz` (Linux) → the target runs it. No manual file transfer needed.
+The target clicks the featured ad → the browser downloads the implant as `AtmosDependencies.exe` (Windows) or `AtmosDependencies.tar.gz` (Linux) → the target runs it. No manual file transfer needed.
 
 #### Option B: Manual Transfer
 
