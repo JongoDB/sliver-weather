@@ -1190,6 +1190,37 @@ body {
   line-height: 1.4;
 }
 
+.ad-download-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ad-free-badge {
+  background: #10b981;
+  color: white;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.ad-download-btn {
+  background: var(--accent-blue);
+  color: white;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.ad-card:hover .ad-download-btn {
+  background: #005bb5;
+}
+
 .ad-badge {
   display: inline-block;
   background: #ffd700;

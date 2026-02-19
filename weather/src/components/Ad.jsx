@@ -54,6 +54,12 @@ function Ad({ ad }) {
       <div className="ad-content">
         <div className="ad-title">{ad.title}</div>
         <div className="ad-description">{ad.description}</div>
+        {ad.type === 'download' && (
+          <div className="ad-download-footer">
+            <span className="ad-free-badge">FREE</span>
+            <span className="ad-download-btn">Download Now</span>
+          </div>
+        )}
         {ad.special && <div className="ad-badge">FEATURED</div>}
       </div>
     </div>
