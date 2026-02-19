@@ -7,7 +7,7 @@ A Docker Compose deployment showcasing the Sliver C2 framework for cybersecurity
 This project demonstrates how Sliver C2 can be deployed alongside legitimate web services to provide a realistic training environment for cybersecurity professionals. The setup includes:
 
 - **Nginx**: Reverse proxy handling HTTPS termination and routing
-- **Weather Site**: Legitimate-looking weather application serving as a cover while sourcing live data from the Open-Meteo API
+- **Weather Site**: Feature-rich React weather application serving as a cover, with multi-page navigation, live Open-Meteo data, and a built-in binary download mechanism disguised as a software ad
 - **Sliver C2**: Command and control framework for adversary simulation
 
 <p align="center">
@@ -30,20 +30,42 @@ This project demonstrates how Sliver C2 can be deployed alongside legitimate web
        │
        ├──────► Weather App (Port 5000) - /weather/
        │             │
-       │             └──────► Open-Meteo API (HTTPS) for live forecasts
+       │             ├──────► Open-Meteo API (HTTPS) for live forecasts
+       │             └──────► /api/download/latest (serves builds/ binaries)
        └──────► Sliver C2 (Port 8080) - /api/news/
 ```
 
+### Weather UI
+
+The cover application is a full React single-page app built with Vite and served by the Express backend. It is designed to look and feel like a legitimate weather portal:
+
+- **Home** — current conditions with today's highlights (UV index, wind speed, precipitation) and a 7-day forecast grid
+- **Today / Hourly / 10-Day / Monthly** — additional forecast views with varying granularity
+- **Explore** — mock weather news articles and featured "ads"; one ad card ("AtmosVision Pro") is wired to `/api/download/latest` and silently delivers the latest implant binary from the `builds/` directory
+- **Dark mode** toggle and responsive layout round out the realistic appearance
+
+The Dockerfile uses a multi-stage build: Vite compiles the React app in a builder stage, then the production image copies only the compiled `dist/` output alongside the Express server.
+
 ### Weather Data Flow
 
-Requests to the cover application's ` /api/weather` endpoint bubble through nginx to the Node weather service. That service:
+Requests to the cover application's `/api/weather` endpoint bubble through nginx to the Node weather service. That service:
 
 1. Accepts a city or region query (e.g. `?q=Berlin`) and caches results to limit third-party calls.
 2. Uses the Open-Meteo Geocoding API to resolve the location into latitude and longitude.
-3. Calls the Open-Meteo Forecast API for current conditions and daily highs/lows in Fahrenheit.
+3. Calls the Open-Meteo Forecast API for a 10-day forecast including highs/lows, precipitation, wind speed, and UV index (all in Fahrenheit / mph).
 4. Returns a JSON bundle that includes formatted location details, the current snapshot, daily forecast, and raw Open-Meteo payload for debugging.
 
 Because nginx forwards `/api/weather` without rewriting the path, you can inspect the live data stream directly at `${PROTOCOL}://${DOMAIN}/api/weather?q=<city>` once the stack is up.
+
+### Binary Download Endpoint
+
+The `/api/download/latest` endpoint enables implant delivery through the cover website. When a visitor clicks the "AtmosVision Pro" ad on the Explore page, the server:
+
+1. Reads the `builds/` directory (mounted as a Docker volume from the host).
+2. Detects the visitor's OS from the `User-Agent` header and filters for matching filenames (e.g. files containing `windows` or `linux`).
+3. Serves the most recently modified matching file — on Windows as a direct download, on Linux/macOS as a `.tar.gz` archive (created on the fly and cleaned up after sending).
+
+This means that after generating an implant in Sliver and saving it to `builds/`, any visitor who clicks the download ad will receive the appropriate binary for their platform — no manual file transfer required.
 
 ## Prerequisites
 
@@ -181,7 +203,19 @@ http --lport 8080 --lhost 0.0.0.0
 
 ### 9. Deploy and Execute the Implant
 
-After generating the implant, you need to:
+After generating the implant, you have two delivery options:
+
+#### Option A: Web Download (recommended for training labs)
+
+Direct the target to the weather site's Explore page. The "AtmosVision Pro" ad triggers a download of the latest OS-matched binary from `builds/`:
+
+```
+${PROTOCOL}://${DOMAIN}/weather/explore
+```
+
+The target clicks the featured ad → the browser downloads the implant → the target runs it. No manual file transfer needed.
+
+#### Option B: Manual Transfer
 
 1. **Copy the implant to your victim/target host**:
    ```bash
@@ -226,6 +260,7 @@ The protocol depends on your `USE_TLS` choice (`https://` when true, `http://` w
 
 - **Weather App**: `${PROTOCOL}://${DOMAIN}/weather/`
 - **Weather API**: `${PROTOCOL}://${DOMAIN}/api/weather?q=<location>`
+- **Binary Download**: `${PROTOCOL}://${DOMAIN}/api/download/latest` (OS-aware, serves from `builds/`)
 - **Sliver C2 Endpoint**: `${PROTOCOL}://${DOMAIN}${SLIVER_C2_PATH}` (default: `/api/news/`)
 
 Use `PROTOCOL=https` when `USE_TLS=true`, otherwise `PROTOCOL=http`.
@@ -292,14 +327,14 @@ Nginx configuration templates live under `nginx/` and are rendered at container 
 - `nginx.conf.template`: HTTPS template with automatic HTTP→HTTPS redirect
 - `nginx.http.conf.template`: HTTP-only template (used when `USE_TLS=false`)
 - `docker-entrypoint.sh` selects the template, performs env substitution, and generates self-signed certificates when needed
-- Routing rules forward `/weather/` and the configured `${SLIVER_C2_PATH}` to their upstream services
+- Routing rules forward `/weather/`, `/api/weather/`, `/api/download/`, and the configured `${SLIVER_C2_PATH}` to their upstream services
 
 ### Docker Compose
 
 The `docker-compose.yml` file reads from `.env` and defines:
 
 - **nginx**: Builds custom image with envsubst, exposes configured HTTP/HTTPS ports
-- **weather**: Weather application service
+- **weather**: React weather app with Express backend; mounts `builds/` for binary delivery
 - **sliver**: Sliver C2 server with volumes for config and builds
 
 All services use the `.env` file for configuration. The nginx service relies on an entrypoint script that selects the correct template, substitutes environment variables, and (optionally) bootstraps certificates before starting nginx.
@@ -368,10 +403,19 @@ sliver-weather/
 │   ├── docker-entrypoint.sh # Template selection, env substitution, TLS automation
 │   └── Dockerfile          # Nginx Dockerfile
 ├── weather/
-│   ├── Dockerfile          # Weather app Dockerfile
-│   ├── server.js           # Weather API server
-│   ├── package.json        # Node.js dependencies
-│   └── public/             # Frontend files
+│   ├── Dockerfile          # Multi-stage build (Vite → Node production)
+│   ├── server.js           # Express API server (weather + download endpoints)
+│   ├── package.json        # Node.js dependencies (React, Vite, Express)
+│   ├── vite.config.js      # Vite build configuration
+│   ├── index.html          # Vite entry HTML
+│   └── src/                # React application source
+│       ├── App.jsx         # Root component with React Router
+│       ├── App.css         # Global styles
+│       ├── main.jsx        # Entry point
+│       ├── components/     # Navbar, WeatherTile, NewsCard, Ad
+│       ├── pages/          # Home, Today, Hourly, TenDay, Monthly, Explore
+│       ├── data/           # Mock news articles and ad definitions
+│       └── utils/          # API helpers and weather visual mappings
 ├── sliver/
 │   ├── Dockerfile          # Sliver Dockerfile
 │   └── docker-entrypoint.sh # Entrypoint script
@@ -486,6 +530,15 @@ http {
     location /api/weather/ {
       proxy_pass http://weather_upstream;
       proxy_http_version 1.1;
+      proxy_set_header Host              $host;
+      proxy_set_header X-Real-IP         $remote_addr;
+      proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header Connection        "";
+    }
+
+    location /api/download/ {
+      proxy_pass http://weather_upstream;
       proxy_set_header Host              $host;
       proxy_set_header X-Real-IP         $remote_addr;
       proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
