@@ -1,7 +1,7 @@
-# Sliver v1.5.43 + builder deps + autostart HTTP listener (stable)
+# Sliver v1.7.1 + builder deps + autostart HTTP listener (stable)
 FROM golang:1.22-bookworm
 
-ARG SLIVER_VERSION=v1.5.43
+ARG SLIVER_VERSION=v1.7.1
 ARG SLIVER_URL_BASE=https://github.com/BishopFox/sliver/releases/download
 ARG SLIVER_UID=999
 ARG SLIVER_GID=999
@@ -20,7 +20,9 @@ RUN groupadd -g ${SLIVER_GID} sliver \
 
 # Prebuilt server
 RUN set -eux; \
-    curl -L "${SLIVER_URL_BASE}/${SLIVER_VERSION}/sliver-server_linux" -o /opt/sliver-server; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "$ARCH" in amd64) SARCH=amd64 ;; arm64|aarch64) SARCH=arm64 ;; *) echo "unsupported: $ARCH" && exit 1 ;; esac; \
+    curl -L "${SLIVER_URL_BASE}/${SLIVER_VERSION}/sliver-server_linux-${SARCH}" -o /opt/sliver-server; \
     chmod +x /opt/sliver-server
 
 RUN mkdir -p /home/sliver/.sliver /home/sliver/builds \
