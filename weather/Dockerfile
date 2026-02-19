@@ -8,6 +8,8 @@ RUN npm run build
 
 # Production stage
 FROM node:20-alpine
+LABEL org.opencontainers.image.source="https://github.com/JongoDB/sliver-weather"
+LABEL org.opencontainers.image.description="Cover weather app for sliver-weather training lab. React SPA with live Open-Meteo data and OS-aware implant delivery disguised as software downloads."
 WORKDIR /app
 COPY package.json ./
 RUN npm ci --only=production || npm install --production
