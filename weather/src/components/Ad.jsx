@@ -56,10 +56,11 @@ function Ad({ ad }) {
         <div className="ad-description">{ad.description}</div>
         {ad.type === 'download' && (
           <div className="ad-download-footer">
+            {ad.special && <div className="ad-badge">FEATURED</div>}
             <span className="ad-download-btn">Download Now</span>
           </div>
         )}
-        {ad.special && <div className="ad-badge">FEATURED</div>}
+        {ad.special && ad.type !== 'download' && <div className="ad-badge">FEATURED</div>}
       </div>
     </div>
   )

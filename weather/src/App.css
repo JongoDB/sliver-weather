@@ -1173,6 +1173,10 @@ body {
   background: #e5e7eb;
 }
 
+.ad-card.special .ad-image {
+  height: 120px;
+}
+
 .ad-content {
   padding: 16px;
 }
@@ -1192,7 +1196,8 @@ body {
 
 .ad-download-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
