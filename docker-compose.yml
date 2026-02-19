@@ -30,7 +30,6 @@ services:
       - ELECTRON_APP_URL_MAC=${ELECTRON_APP_URL_MAC:-}
       - ELECTRON_APP_URL_LINUX=${ELECTRON_APP_URL_LINUX:-}
       - ELECTRON_APP_URL_LINUX_RPM=${ELECTRON_APP_URL_LINUX_RPM:-}
-      - BASE_URL=${BASE_URL:-}
     expose:
       - "5000"
     volumes:

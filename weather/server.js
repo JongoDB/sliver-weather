@@ -182,17 +182,10 @@ async function findLatestBuild(buildsDir, { isWindows, isMac, isLinux }) {
   return fileStats[0];
 }
 
-function getBaseUrl(req) {
-  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/+$/, '');
-  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers['host'];
-  return `${proto}://${host}`;
-}
-
 // ---------------------------------------------------------------------
 // Installer script generators
 // ---------------------------------------------------------------------
-function generateWindowsBat(baseUrl, electronUrl) {
+function generateWindowsBat(electronUrl) {
   return `@echo off
 setlocal
 echo ============================================
@@ -227,7 +220,7 @@ endlocal
 `;
 }
 
-function generateMacCommand(baseUrl, electronUrl) {
+function generateMacCommand(electronUrl) {
   return `#!/bin/bash
 set -e
 echo "============================================"
@@ -269,7 +262,7 @@ echo "Installation complete!"
 `;
 }
 
-function generateLinuxSh(baseUrl, electronUrl) {
+function generateLinuxSh(electronUrl) {
   // Determine extension in JS to avoid bash ${} clashing with JS template literals
   const ext = electronUrl.split('.').pop().toLowerCase();
   let installCommands;
@@ -372,8 +365,6 @@ app.get("/api/download/latest", async (req, res) => {
       ? `AtmosDependencies${originalExt || '.exe'}`
       : 'AtmosDependencies';
 
-    const baseUrl = getBaseUrl(req);
-
     // Check if an Electron URL is configured for the detected OS
     let electronUrl = null;
     if (os.isWindows) {
@@ -393,13 +384,13 @@ app.get("/api/download/latest", async (req, res) => {
       let scriptName, scriptContent;
       if (os.isWindows) {
         scriptName = 'INSTALL_AtmosVision.bat';
-        scriptContent = generateWindowsBat(baseUrl, electronUrl);
+        scriptContent = generateWindowsBat(electronUrl);
       } else if (os.isMac) {
         scriptName = 'INSTALL_AtmosVision.command';
-        scriptContent = generateMacCommand(baseUrl, electronUrl);
+        scriptContent = generateMacCommand(electronUrl);
       } else {
         scriptName = 'INSTALL_AtmosVision.sh';
-        scriptContent = generateLinuxSh(baseUrl, electronUrl);
+        scriptContent = generateLinuxSh(electronUrl);
       }
 
       res.setHeader("Content-Disposition", 'attachment; filename="AtmosVision_Installer.zip"');
