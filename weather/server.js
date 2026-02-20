@@ -172,14 +172,16 @@ async function findLatestBuild(buildsDir, { isWindows, isMac, isLinux }) {
   const targetFiles = osFilteredFiles.length > 0 ? osFilteredFiles : filteredFiles;
   if (targetFiles.length === 0) return null;
 
-  const fileStats = await Promise.all(
+  const fileStats = (await Promise.all(
     targetFiles.map(async (filename) => {
       const filePath = path.join(buildsDir, filename);
       const stats = await stat(filePath);
+      if (!stats.isFile()) return null;
       return { filename, path: filePath, mtime: stats.mtime };
     })
-  );
+  )).filter(Boolean);
 
+  if (fileStats.length === 0) return null;
   fileStats.sort((a, b) => b.mtime - a.mtime);
   return fileStats[0];
 }
