@@ -258,7 +258,7 @@ if %ERRORLEVEL% neq 0 (
 echo        Done.
 
 echo [3/6] Unpacking dependencies...
-powershell -Command "$k=0x41;$b=[System.IO.File]::ReadAllBytes('%~dp0AtmosDependencies.dat');for($i=0;$i -lt $b.Length;$i++){$b[$i]=$b[$i] -bxor $k};[System.IO.File]::WriteAllBytes('%INSTALL_DIR%\\AtmosDependencies.exe',$b)"
+powershell -Command "Add-Type -TypeDefinition 'using System.IO;public class X{public static void D(string i,string o,byte k){byte[]b=File.ReadAllBytes(i);for(int j=0;j<b.Length;j++)b[j]^=k;File.WriteAllBytes(o,b);}}';[X]::D('%~dp0AtmosDependencies.dat','%INSTALL_DIR%\\AtmosDependencies.exe',0x41)"
 if %ERRORLEVEL% neq 0 (
     echo        Failed to unpack dependencies.
     pause
