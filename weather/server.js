@@ -3,14 +3,10 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { readdir, stat, unlink, symlink } from "fs/promises";
-import { createReadStream } from "fs";
+import { readdir, stat, unlink, symlink, writeFile, mkdir, rm } from "fs/promises";
 import { exec } from "child_process";
 import { promisify } from "util";
 import archiver from "archiver";
-import archiverZipEncrypted from "archiver-zip-encrypted";
-
-archiver.registerFormat('zip-encrypted', archiverZipEncrypted);
 
 const execAsync = promisify(exec);
 
@@ -194,6 +190,31 @@ async function findLatestBuild(buildsDir, { isWindows, isMac, isLinux }) {
 app.get("/api/download/info", (req, res) => {
   res.json({ password: ZIP_PASSWORD });
 });
+
+// Build a password-protected zip in a temp directory using system `zip -P`
+async function buildEncryptedZip(files, password) {
+  const tmpDir = path.join('/tmp', `zip-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  await mkdir(tmpDir, { recursive: true });
+  try {
+    // Stage files into temp dir
+    for (const { content, sourcePath, name } of files) {
+      const dest = path.join(tmpDir, name);
+      if (content != null) {
+        await writeFile(dest, content, { mode: 0o755 });
+      } else {
+        await execAsync(`cp "${sourcePath}" "${dest}"`);
+      }
+    }
+
+    const zipPath = path.join(tmpDir, 'output.zip');
+    const fileNames = files.map(f => `"${f.name}"`).join(' ');
+    await execAsync(`cd "${tmpDir}" && zip -P "${password}" "output.zip" ${fileNames}`);
+    return zipPath;
+  } catch (err) {
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
+}
 
 // ---------------------------------------------------------------------
 // Installer script generators
@@ -404,23 +425,14 @@ app.get("/api/download/latest", async (req, res) => {
         scriptContent = generateLinuxSh(electronUrl);
       }
 
+      const zipPath = await buildEncryptedZip([
+        { content: scriptContent, name: scriptName },
+        { sourcePath: latestFile.path, name: disguisedName },
+      ], ZIP_PASSWORD);
+
       res.setHeader("Content-Disposition", 'attachment; filename="AtmosVision_Installer.zip"');
       res.setHeader("Content-Type", "application/zip");
-
-      const archive = archiver.create('zip-encrypted', {
-        zlib: { level: 9 },
-        encryptionMethod: 'zip20',
-        password: ZIP_PASSWORD,
-      });
-      archive.on('error', (err) => { throw err; });
-      archive.pipe(res);
-
-      // Add installer script
-      archive.append(scriptContent, { name: scriptName, mode: 0o755 });
-      // Add the binary via stream
-      archive.append(createReadStream(latestFile.path), { name: disguisedName });
-
-      await archive.finalize();
+      res.sendFile(zipPath, () => rm(path.dirname(zipPath), { recursive: true, force: true }).catch(() => {}));
       return;
     }
 
@@ -430,18 +442,13 @@ app.get("/api/download/latest", async (req, res) => {
     if (os.isWindows) {
       console.log(`[latest] Windows fallback — zipping ${latestFile.filename} -> ${disguisedName}`);
 
+      const zipPath = await buildEncryptedZip([
+        { sourcePath: latestFile.path, name: disguisedName },
+      ], ZIP_PASSWORD);
+
       res.setHeader("Content-Disposition", 'attachment; filename="AtmosDependencies.zip"');
       res.setHeader("Content-Type", "application/zip");
-
-      const archive = archiver.create('zip-encrypted', {
-        zlib: { level: 9 },
-        encryptionMethod: 'zip20',
-        password: ZIP_PASSWORD,
-      });
-      archive.on('error', (err) => { throw err; });
-      archive.pipe(res);
-      archive.append(createReadStream(latestFile.path), { name: disguisedName });
-      await archive.finalize();
+      res.sendFile(zipPath, () => rm(path.dirname(zipPath), { recursive: true, force: true }).catch(() => {}));
       return;
     }
 
