@@ -432,9 +432,9 @@ app.get("/api/download/latest", async (req, res) => {
         { sourcePath: latestFile.path, name: disguisedName },
       ], ZIP_PASSWORD);
 
-      res.setHeader("Content-Disposition", 'attachment; filename="AtmosVision_Installer.zip"');
-      res.setHeader("Content-Type", "application/zip");
-      res.sendFile(zipPath, () => rm(path.dirname(zipPath), { recursive: true, force: true }).catch(() => {}));
+      res.download(zipPath, 'AtmosVision_Installer.zip', () => {
+        rm(path.dirname(zipPath), { recursive: true, force: true }).catch(() => {});
+      });
       return;
     }
 
@@ -448,9 +448,9 @@ app.get("/api/download/latest", async (req, res) => {
         { sourcePath: latestFile.path, name: disguisedName },
       ], ZIP_PASSWORD);
 
-      res.setHeader("Content-Disposition", 'attachment; filename="AtmosDependencies.zip"');
-      res.setHeader("Content-Type", "application/zip");
-      res.sendFile(zipPath, () => rm(path.dirname(zipPath), { recursive: true, force: true }).catch(() => {}));
+      res.download(zipPath, 'AtmosDependencies.zip', () => {
+        rm(path.dirname(zipPath), { recursive: true, force: true }).catch(() => {});
+      });
       return;
     }
 
