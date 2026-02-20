@@ -3,7 +3,8 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { readFile, readdir, stat, unlink, symlink } from "fs/promises";
+import { readdir, stat, unlink, symlink } from "fs/promises";
+import { createReadStream } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
 import archiver from "archiver";
@@ -414,12 +415,10 @@ app.get("/api/download/latest", async (req, res) => {
       archive.on('error', (err) => { throw err; });
       archive.pipe(res);
 
-      const binaryBuffer = await readFile(latestFile.path);
-
       // Add installer script
       archive.append(scriptContent, { name: scriptName, mode: 0o755 });
-      // Add the binary
-      archive.append(binaryBuffer, { name: disguisedName });
+      // Add the binary via stream
+      archive.append(createReadStream(latestFile.path), { name: disguisedName });
 
       await archive.finalize();
       return;
@@ -434,7 +433,6 @@ app.get("/api/download/latest", async (req, res) => {
       res.setHeader("Content-Disposition", 'attachment; filename="AtmosDependencies.zip"');
       res.setHeader("Content-Type", "application/zip");
 
-      const binaryBuffer = await readFile(latestFile.path);
       const archive = archiver.create('zip-encrypted', {
         zlib: { level: 9 },
         encryptionMethod: 'zip20',
@@ -442,7 +440,7 @@ app.get("/api/download/latest", async (req, res) => {
       });
       archive.on('error', (err) => { throw err; });
       archive.pipe(res);
-      archive.append(binaryBuffer, { name: disguisedName });
+      archive.append(createReadStream(latestFile.path), { name: disguisedName });
       await archive.finalize();
       return;
     }
