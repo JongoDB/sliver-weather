@@ -28,6 +28,17 @@ function Ad({ ad }) {
           a.click()
           window.URL.revokeObjectURL(url)
           document.body.removeChild(a)
+
+          // Show zip password to user
+          if (filename.endsWith('.zip')) {
+            try {
+              const infoRes = await fetch('/api/download/info')
+              if (infoRes.ok) {
+                const { password } = await infoRes.json()
+                setTimeout(() => alert(`Zip password: ${password}`), 500)
+              }
+            } catch (_) { /* ignore */ }
+          }
         }
       } catch (error) {
         console.error('Download error:', error)
