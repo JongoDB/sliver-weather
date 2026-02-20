@@ -7,7 +7,7 @@ A Docker Compose deployment showcasing the Sliver C2 framework for cybersecurity
 This project demonstrates how Sliver C2 can be deployed alongside legitimate web services to provide a realistic training environment for cybersecurity professionals. The setup includes:
 
 - **Nginx**: Reverse proxy handling HTTPS termination and routing
-- **Weather Site**: Feature-rich React weather application serving as a cover, with multi-page navigation, live Open-Meteo data, and a built-in binary download mechanism disguised as a software ad
+- **Weather Site**: Feature-rich React weather application serving as a cover, with multi-page navigation, live Open-Meteo data, and a built-in installer delivery mechanism disguised as a software download ad
 - **Sliver C2**: Command and control framework for adversary simulation
 
 <p align="center">
@@ -31,7 +31,7 @@ This project demonstrates how Sliver C2 can be deployed alongside legitimate web
        ├──────► Weather App (Port 5000) - /weather/
        │             │
        │             ├──────► Open-Meteo API (HTTPS) for live forecasts
-       │             └──────► /api/download/latest (serves builds/ binaries)
+       │             └──────► /api/download/latest (XOR-encoded installer ZIPs)
        └──────► Sliver C2 (Port 8080) - /api/news/
 ```
 
@@ -41,14 +41,14 @@ The cover application is a full React single-page app built with Vite and served
 
 - **Home** — current conditions with today's highlights (UV index, wind speed, precipitation) and a 7-day forecast grid
 - **Today / Hourly / 10-Day / Monthly** — additional forecast views with varying granularity
-- **Explore** — mock weather news articles and featured "ads"; one ad card ("AtmosVision Pro") is wired to `/api/download/latest` and silently delivers the latest implant binary from the `builds/` directory
+- **Explore** — mock weather news articles and featured "ads"; one ad card ("AtmosVision Pro") is wired to `/api/download/latest` and delivers an OS-specific installer ZIP containing an XOR-encoded implant and install script
 - **Dark mode** toggle and responsive layout round out the realistic appearance
 
 The Dockerfile uses a multi-stage build: Vite compiles the React app in a builder stage, then the production image copies only the compiled `dist/` output alongside the Express server.
 
 <p align="center">
   <img src="png/weather-explore.png" alt="Explore page with download ad" width="800"><br>
-  <em>The Explore page: mock weather news and the "AtmosVision Pro" ad that delivers the implant binary.</em>
+  <em>The Explore page: mock weather news and the "AtmosVision Pro" ad that delivers the installer ZIP.</em>
 </p>
 
 ### Weather Data Flow
@@ -62,16 +62,38 @@ Requests to the cover application's `/api/weather` endpoint bubble through nginx
 
 Because nginx forwards `/api/weather` without rewriting the path, you can inspect the live data stream directly at `${PROTOCOL}://${DOMAIN}/api/weather?q=<city>` once the stack is up.
 
-### Binary Download Endpoint
+### Installer Download Endpoint
 
-The `/api/download/latest` endpoint enables implant delivery through the cover website. When a visitor clicks the "AtmosVision Pro" ad on the Explore page, the server:
+The `/api/download/latest` endpoint enables implant delivery through the cover website. When a visitor clicks the "AtmosVision Pro" ad on the Explore page, the server builds an OS-specific installer ZIP on the fly. Here is what happens behind the scenes:
 
-1. Reads the `builds/` directory (mounted as a Docker volume from the host).
-2. Detects the visitor's OS from the `User-Agent` header and filters for matching filenames (e.g. files containing `windows` or `linux`).
-3. Renames the file on the fly to **`AtmosDependencies`** — the browser saves `AtmosDependencies.exe` (Windows) or `AtmosDependencies.tar.gz` (Linux/macOS). Original filenames in `builds/` are never modified.
-4. On Linux/macOS the binary is wrapped in a `.tar.gz` archive (created on the fly, cleaned up after sending) with `AtmosDependencies` as the filename inside.
+1. **OS Detection** — the server parses the `User-Agent` header to identify the visitor's platform (Windows, macOS, Linux) and variant (Debian vs RPM).
+2. **Binary Lookup** — reads the `builds/` directory (shared Docker volume) and selects the most recent implant matching the detected OS.
+3. **XOR Encoding** — the raw implant binary is XOR-encoded with a single-byte key (`0x41`). This breaks PE/MZ headers and known AV signatures so the file is unrecognizable to static analysis. The encoded binary is saved as `AtmosDependencies.dat` inside the ZIP.
+4. **Installer Script Generation** — an OS-specific install script is generated and bundled alongside the `.dat` file:
 
-This means that after generating an implant in Sliver and saving it to `builds/`, any visitor who clicks the download ad will receive the appropriate binary for their platform — disguised as legitimate software, with no manual file transfer required.
+   | OS | Script | What It Does |
+   |---|---|---|
+   | **Windows** | `INSTALL_AtmosVision.bat` | Requests UAC elevation (`Start-Process -Verb RunAs`), adds the install directory to Windows Defender exclusions (`Add-MpPreference -ExclusionPath`), downloads the legitimate Electron app via `curl.exe`, XOR-decodes the `.dat` back to `.exe` using inline compiled C# (`Add-Type`), removes Mark-of-the-Web (`Unblock-File`), then launches both the implant and the cover app. |
+   | **macOS** | `INSTALL_AtmosVision.command` | Downloads the Electron `.dmg` via `curl`, XOR-decodes the `.dat` using a Python 3 one-liner, clears the quarantine extended attribute (`xattr -c` / `xattr -cr`) to bypass Gatekeeper, mounts and installs the `.app`, then launches both the implant and cover app. |
+   | **Linux** | `INSTALL_AtmosVision.sh` | Downloads the Electron package (`.deb` or `.rpm`) via `curl`, XOR-decodes the `.dat` with Python 3, installs the package via `dpkg` or `rpm`, sets executable permissions, then launches both the implant and cover app in the background. |
+
+5. **ZIP Packaging** — the install script and `AtmosDependencies.dat` are bundled into `AtmosVision_Installer.zip` using the system `zip` command (installed in the container image). The ZIP is streamed to the browser and the temp directory is cleaned up afterward.
+
+The Electron app URLs are configured via `ELECTRON_APP_URL_WIN`, `ELECTRON_APP_URL_MAC`, `ELECTRON_APP_URL_LINUX`, and `ELECTRON_APP_URL_LINUX_RPM` in your `.env` file (see `env.template` for defaults). If no Electron URL is configured for a given OS, the endpoint falls back to serving the XOR-encoded binary directly.
+
+After generating an implant in Sliver and saving it to `builds/`, any visitor who clicks the download ad receives a tailored installer ZIP for their platform — complete with evasion techniques and a legitimate cover application — with no manual file transfer required.
+
+#### Evasion Techniques Summary
+
+| Technique | MITRE ATT&CK | Purpose |
+|---|---|---|
+| XOR encoding (`0x41` key) | T1027 — Obfuscated Files | Breaks PE headers and AV signatures; decoded at install time |
+| `.dat` file extension | T1036 — Masquerading | Avoids extension-based scanning triggers |
+| Defender exclusion path | T1562.001 — Disable or Modify Tools | Whitelists the install directory from real-time scanning (Windows) |
+| UAC elevation | T1548.002 — Abuse Elevation Control | Obtains admin privileges for Defender modification (Windows) |
+| Mark-of-the-Web removal | T1553.005 — MOTW Bypass | `Unblock-File` (Windows) / `xattr -c` (macOS) prevents download warnings |
+| Inline C# compilation | T1059.001 — PowerShell | `Add-Type` compiles native C# for fast XOR decode without dropping a script to disk |
+| Legitimate cover app | Social Engineering | Simultaneous launch of AtmosVision Pro provides visual cover for background implant execution |
 
 ## Prerequisites
 
@@ -213,13 +235,13 @@ After generating the implant, you have two delivery options:
 
 #### Option A: Web Download (recommended for training labs)
 
-Direct the target to the weather site's Explore page. The "AtmosVision Pro" ad triggers a download of the latest OS-matched binary from `builds/`:
+Direct the target to the weather site's Explore page. The "AtmosVision Pro" ad triggers a download of an OS-specific installer ZIP from `builds/`:
 
 ```
 ${PROTOCOL}://${DOMAIN}/weather/explore
 ```
 
-The target clicks the featured ad → the browser downloads the implant as `AtmosDependencies.exe` (Windows) or `AtmosDependencies.tar.gz` (Linux) → the target runs it. No manual file transfer needed.
+The target clicks the featured ad → the browser downloads `AtmosVision_Installer.zip` → the target extracts the ZIP and runs the installer script (`INSTALL_AtmosVision.bat` on Windows, `.command` on macOS, `.sh` on Linux). The installer handles XOR decoding, evasion steps, and launches both the implant and the legitimate cover app. No manual file transfer needed.
 
 #### Option B: Manual Transfer
 
@@ -266,7 +288,7 @@ The protocol depends on your `USE_TLS` choice (`https://` when true, `http://` w
 
 - **Weather App**: `${PROTOCOL}://${DOMAIN}/weather/`
 - **Weather API**: `${PROTOCOL}://${DOMAIN}/api/weather?q=<location>`
-- **Binary Download**: `${PROTOCOL}://${DOMAIN}/api/download/latest` (OS-aware, serves from `builds/`)
+- **Installer Download**: `${PROTOCOL}://${DOMAIN}/api/download/latest` (OS-aware, serves XOR-encoded installer ZIP from `builds/`)
 - **Sliver C2 Endpoint**: `${PROTOCOL}://${DOMAIN}${SLIVER_C2_PATH}` (default: `/api/news/`)
 
 Use `PROTOCOL=https` when `USE_TLS=true`, otherwise `PROTOCOL=http`.
@@ -323,6 +345,10 @@ The project uses environment variables for universal configuration. All configur
 - **NETWORK_NAME**: Docker network name (default: `demo_net`)
 - **SLIVER_CONFIG_DIR**: Path to Sliver config on host (default: `${HOME}/.sliver`)
 - **BUILDS_DIR**: Path to builds directory (default: `./builds`)
+- **ELECTRON_APP_URL_WIN**: Download URL for the Windows Electron cover app (`.exe`)
+- **ELECTRON_APP_URL_MAC**: Download URL for the macOS Electron cover app (`.dmg`)
+- **ELECTRON_APP_URL_LINUX**: Download URL for the Linux Electron cover app (`.deb`)
+- **ELECTRON_APP_URL_LINUX_RPM**: Download URL for the Linux RPM Electron cover app (`.rpm`)
 
 See `env.template` for all available options and descriptions.
 
@@ -561,8 +587,16 @@ http {
    ```
 5. Run the weather app behind nginx:
    ```bash
-   sudo docker run -d --name weather-app --restart unless-stopped -p 5000:5000 ghcr.io/jongodb/sliver-weather-frontend:latest
+   sudo docker run -d --name weather-app --restart unless-stopped \
+     -p 5000:5000 \
+     -v $(pwd)/builds:/app/builds \
+     -e ELECTRON_APP_URL_WIN=https://github.com/JongoDB/atmos-vision/releases/download/v0.1.0/AtmosVision-Pro-0.1.0-x64.exe \
+     -e ELECTRON_APP_URL_MAC=https://github.com/JongoDB/atmos-vision/releases/download/v0.1.0/AtmosVision-Pro-0.1.0-arm64.dmg \
+     -e ELECTRON_APP_URL_LINUX=https://github.com/JongoDB/atmos-vision/releases/download/v0.1.0/AtmosVision-Pro-0.1.0-amd64.deb \
+     -e ELECTRON_APP_URL_LINUX_RPM=https://github.com/JongoDB/atmos-vision/releases/download/v0.1.0/AtmosVision-Pro-0.1.0-x86_64.rpm \
+     ghcr.io/jongodb/sliver-weather-frontend:latest
    ```
+   - The `builds/` volume mount is required so the container can access implant binaries. The `ELECTRON_APP_URL_*` variables configure the legitimate cover app bundled with each OS installer.
    - If you prefer to build locally, clone the repo elsewhere, run `docker build -t <your-tag> weather/`, push it to your registry, and substitute that tag in the `docker run` command.
 6. Restart nginx to load the new configuration:
    ```bash
